@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum PerfilUsuario {
+  TECNICO
+  NAO_TECNICO
+}
+
+model Usuario {
+  id        String        @id @default(cuid())
+  codigo    String        @unique
+  senhaHash String
+  ativo     Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  sessoes   SessaoTeste[]
+}
+
+model NotaFiscal {
+  id                 String              @id @default(cuid())
+  numero             String              @unique
+  fornecedor         String
+  dataEmissao        DateTime
+  valorTotal         Float
+  createdAt          DateTime            @default(now())
+  itensRecebidos     ItemRecebido[]
+  lancamentosEstoque LancamentoEstoque[]
+}
+
+model ItemRecebido {
+  id           String     @id @default(cuid())
+  codigo       String
+  descricao    String
+  qtdPedida    Float
+  qtdRecebida  Float
+  unidade      String
+  notaFiscalId String
+  notaFiscal   NotaFiscal @relation(fields: [notaFiscalId], references: [id])
+}
+
+model LancamentoEstoque {
+  id           String     @id @default(cuid())
+  armazem      String
+  lote         String
+  quantidade   Float
+  status       String
+  notaFiscalId String
+  notaFiscal   NotaFiscal @relation(fields: [notaFiscalId], references: [id])
+  createdAt    DateTime   @default(now())
+}
+
+model SessaoTeste {
+  id              String        @id @default(cuid())
+  usuarioId       String
+  usuario         Usuario       @relation(fields: [usuarioId], references: [id])
+  perfilUsuario   PerfilUsuario
+  cenario         String
+  conjuntoTarefa  String
+  timestampInicio DateTime
+  timestampFim    DateTime?
+  eventosErro     EventoErro[]
+}
+
+model EventoErro {
+  id        String      @id @default(cuid())
+  sessaoId  String
+  sessao    SessaoTeste @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+  tipo      String
+  timestamp DateTime    @default(now())
+  detalhe   String?
+}
