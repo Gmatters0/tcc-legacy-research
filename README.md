@@ -3,7 +3,7 @@
 Aplicação web desenvolvida como parte de um Trabalho de Conclusão de Curso (TCC) para
 investigar, de forma empírica, o impacto do design de interface na usabilidade de sistemas
 ERP. O projeto implementa **duas interfaces visualmente distintas** para o mesmo fluxo de
-negócio real de um ERP — recebimento de mercadoria — e instrumenta cada sessão de uso para
+negócio real de um ERP (recebimento de mercadoria) e instrumenta cada sessão de uso para
 coletar métricas objetivas de desempenho e erro.
 
 ## Índice
@@ -36,10 +36,10 @@ a mudanças, apesar de décadas de evolução no design de interfaces. A pergunt
 investiga é: **o quanto o design da interface, isoladamente, afeta o desempenho e a taxa de
 erro de um usuário realizando a mesma tarefa de negócio?**
 
-Para responder isso com rigor, o experimento não compara "um ERP" com "outro ERP" — compara
+Para responder isso com rigor, o experimento não compara "um ERP" com "outro ERP", compara
 duas *interfaces* diferentes para **exatamente a mesma lógica de negócio, rodando sobre a
 mesma API e o mesmo banco de dados**. Qualquer diferença de resultado entre os dois grupos de
-teste só pode, portanto, ser atribuída ao design — não a diferenças de regra de negócio, de
+teste só pode, portanto, ser atribuída ao design, não a diferenças de regra de negócio, de
 dado disponível ou de comportamento do servidor.
 
 O experimento mede dois indicadores por sessão de participante:
@@ -62,7 +62,7 @@ por fim lança a entrada em estoque, informando o depósito de destino e o lote.
 
 Cada participante realiza a tarefa **duas vezes**, uma em cada cenário, usando conjuntos de
 dados diferentes entre as duas tentativas (para evitar efeito de aprendizado/memorização do
-conteúdo específico da nota fiscal). O sistema garante automaticamente essa regra — ver
+conteúdo específico da nota fiscal). O sistema garante automaticamente essa regra: ver
 [Regra de não-repetição](#autenticação-e-ciclo-de-vida-do-participante).
 
 ### Cenário A — Interface Legada
@@ -76,7 +76,7 @@ rodapé com teclas de função (F2–F12, no estilo terminal 3270/SAP).
 
 Aplicação das heurísticas de usabilidade de Nielsen: **wizard guiado de 3 passos**, validação
 em tempo real campo a campo, feedback visual imediato (bordas vermelhas, badges de status),
-navegação por Stepper clicável, e prevenção de erro por design onde faz sentido — por exemplo,
+navegação por Stepper clicável, e prevenção de erro por design onde faz sentido, por exemplo,
 o campo de depósito de destino é um `<select>` de opções fixas em vez de texto livre, evitando
 por construção um erro que no Cenário A é possível (digitar um código de depósito inválido).
 
@@ -113,7 +113,7 @@ medido — não violam a regra, porque a lógica e os dados por trás continuam 
 - **[Prisma 7](https://www.prisma.io)** + **SQLite**, via driver adapter
   `@prisma/adapter-better-sqlite3` (Prisma 7 exige um adapter explícito, não aceita mais
   conexão direta por `DATABASE_URL`).
-- **[Tailwind CSS v4](https://tailwindcss.com)** para estilo — sem arquivo central de design
+- **[Tailwind CSS v4](https://tailwindcss.com)** para estilo, sem arquivo central de design
   tokens; cores e espaçamentos foram extraídos diretamente do Figma e aplicados como classes
   arbitrárias componente a componente (ex.: `text-[#004ac6]`).
   **[lucide-react](https://lucide.dev)** para ícones.
@@ -135,15 +135,15 @@ experimento:
 |---|---|---|
 | **UI dos cenários** | Renderização, interação, chamadas HTTP para a API | `app/cenario-a/`, `app/cenario-b/` |
 | **UI compartilhada** | Login, setup de sessão, telas de encerramento, painel admin | `app/page.tsx`, `app/components/`, `app/sucesso/`, `app/obrigado/`, `app/admin/` |
-| **API** | Route Handlers HTTP — validam autenticação/sessão e delegam para a camada de negócio | `app/api/**` |
+| **API** | Route Handlers HTTP - validam autenticação/sessão e delegam para a camada de negócio | `app/api/**` |
 | **Regras de negócio** | Única fonte de validação e regras do domínio (NF, conferência, baixa, elegibilidade) | `lib/business-logic/` |
 | **Instrumentação** | Cronômetro de sessão e registro dos 4 tipos de evento de erro | `lib/instrumentation/` |
 | **Autenticação** | Login de participante (hash de senha, cookie de sessão) | `lib/auth/` |
 | **Admin** | Autenticação do painel administrativo (segredo único, sem tabela própria) | `lib/admin/` |
 | **Persistência** | Cliente Prisma singleton | `lib/prisma.ts`, `prisma/schema.prisma` |
 
-Toda resposta de erro da API segue um formato estruturado único —
-`{ erros: [{ campo, mensagem }] }` — usado tanto para exibir a mensagem ao usuário quanto para
+Toda resposta de erro da API segue um formato estruturado único -
+`{ erros: [{ campo, mensagem }] }` - usado tanto para exibir a mensagem ao usuário quanto para
 alimentar a instrumentação de erros (ver adiante). Nenhuma operação grava parcialmente: as
 funções de negócio validam tudo antes de tocar no banco e lançam `BusinessLogicError` em caso
 de falha.
@@ -222,16 +222,16 @@ model EventoErro {
 
 Pontos que merecem atenção:
 
-- **`Usuario.codigo` nunca é o nome real do participante** — é um código atribuído pelo
+- **`Usuario.codigo` nunca é o nome real do participante**: é um código atribuído pelo
   pesquisador no formato `P[Iniciais]-[Sequencial]` (ex.: `PJS-01`). A identificação real,
   quando necessária (ex.: para o Termo de Consentimento Livre e Esclarecido), fica em registro
   físico ou separado, nunca neste banco.
 - **`SessaoTeste` é o registro central do experimento**: guarda quem (`usuarioId`), com qual
   perfil, em qual cenário, com qual conjunto de tarefa, e os dois timestamps que definem o
   Time-on-Task.
-- **`EventoErro.sessao` tem `onDelete: Cascade`** — se uma sessão é descartada (abandono, ver
+- **`EventoErro.sessao` tem `onDelete: Cascade`**: se uma sessão é descartada (abandono, ver
   adiante), seus eventos de erro somem junto, nunca ficam órfãos no banco.
-- **`LancamentoEstoque.status`** é derivado automaticamente da comparação entre quantidade
+- **`LancamentoEstoque.status`**: é derivado automaticamente da comparação entre quantidade
   pedida e recebida — nunca escolhido pelo usuário.
 
 ## Fluxo de negócio
@@ -254,7 +254,7 @@ O fluxo de negócio é **idêntico** nos dois cenários e implementado inteirame
 ## Regras de negócio e validações
 
 Toda validação acontece **no servidor**, dentro de `lib/business-logic/`, nunca só no
-client — o client valida "cedo" só para dar feedback rápido (no Cenário B), mas a fonte da
+client, o client valida "cedo" só para dar feedback rápido (no Cenário B), mas a fonte da
 verdade é sempre a API.
 
 | Campo | Regra |
@@ -267,7 +267,7 @@ verdade é sempre a API.
 | `ItemRecebido.qtdPedida` | Obrigatória, **deve ser maior que zero** |
 | `ItemRecebido.qtdRecebida` | Obrigatória, **deve ser maior que zero** |
 | `LancamentoEstoque.armazem` | Obrigatório, texto livre — não validado quanto ao conteúdo |
-| `LancamentoEstoque.lote` | Obrigatório, texto livre — divergências de conteúdo só detectáveis por heurística (ver instrumentação), **nunca bloqueadas** |
+| `LancamentoEstoque.lote` | Obrigatório, texto livre, divergências de conteúdo só detectáveis por heurística (ver instrumentação), **nunca bloqueadas** |
 | `LancamentoEstoque.quantidade` | Obrigatória, **deve ser maior que zero** |
 | Baixa sem conferência prévia | Bloqueada — a nota precisa ter ao menos um item conferido |
 
@@ -366,7 +366,7 @@ sem cadastro livre:
    `SessaoTeste` e começa a contagem do Time-on-Task.
 4. Ao concluir a tarefa com sucesso, o participante cai na tela **`/sucesso`**, com duas
    opções: **"Voltar à tela inicial"** (para fazer o segundo cenário) ou **"Finalizar
-   participação"** (desativa o `Usuario` — impedindo login futuro — e encerra a sessão de
+   participação"** (desativa o `Usuario`, impedindo login futuro, e encerra a sessão de
    login, terminando em **`/obrigado`**, a tela final de agradecimento).
 
 ### Regra de não-repetição
@@ -403,12 +403,12 @@ pesquisador não usa as mesmas credenciais dos participantes.
   nem estado em memória do processo).
 - **Gestão de participantes**: criação de `Usuario` a partir das iniciais (gera código e
   senha automaticamente, como descrito acima), listagem com status (ativo/inativo) e histórico
-  de cenários/conjuntos já concluídos, e ativação/desativação manual — útil, por exemplo, para
+  de cenários/conjuntos já concluídos, e ativação/desativação manual, útil, por exemplo, para
   reabrir a participação de alguém que precisou repetir um teste por problema técnico.
 - **Grid de sessões e exportação de dados**: uma tabela com todas as sessões registradas —
   participante, perfil, cenário, conjunto de tarefa, duração, e a contagem de eventos de erro
   por tipo. Os dados podem ser exportados em **CSV ou JSON**, para todos os participantes de
-  uma vez ou filtrados por um único participante — pronto para importar direto em uma
+  uma vez ou filtrados por um único participante, pronto para importar direto em uma
   ferramenta de análise estatística (R, Python/pandas, Excel).
 
 ## Cenário A vs. Cenário B: o que muda e o que não muda
@@ -557,29 +557,29 @@ vitest.config.mts            configuração dos testes automatizados
   crash, reload confirmado) é sempre removida do banco — nunca aparece na grid do admin nem
   entra nas estatísticas. Isso é intencional: o experimento só quer medir tentativas
   completas.
-- **Divergência de quantidade nunca bloqueia a baixa** — é um comportamento operacional
+- **Divergência de quantidade nunca bloqueia a baixa**: é um comportamento operacional
   esperado de um ERP real, não um erro do usuário. O sistema só a sinaliza no status final.
-- **`ERRO_LOGICO_CADASTRO` nunca bloqueia o cadastro** — por definição, é um erro que o sistema
+- **`ERRO_LOGICO_CADASTRO` nunca bloqueia o cadastro**: por definição, é um erro que o sistema
   tecnicamente aceita; bloquear descaracterizaria o que está sendo medido (o quanto o design
   ajuda o usuário a perceber sozinho um erro que o sistema não pega).
-- **O aviso de reload usa o texto nativo do navegador**, fora do controle da aplicação — não é
+- **O aviso de reload usa o texto nativo do navegador**:, fora do controle da aplicação — não é
   possível estilizá-lo ou traduzir seu conteúdo por completo em todos os navegadores.
-- **O conteúdo real dos conjuntos de tarefa não fica no código.** `CONJUNTOS_TAREFA` em
+- **O conteúdo real dos conjuntos de tarefa não fica no código**: `CONJUNTOS_TAREFA` em
   `lib/task-config.ts` só define os rótulos (“Conjunto de Tarefas 1/2”); os dados de exemplo
   de cada conjunto (duas notas fiscais fictícias, com itens e divergências propositais) foram
   definidos pelo pesquisador e são entregues ao participante fora do sistema
   (impresso ou verbalmente), por decisão de desenho do experimento.
-- **A desativação de um `Usuario` é definitiva até reativação manual** — depois de "Finalizar
+- **A desativação de um `Usuario` é definitiva até reativação manual**: — depois de "Finalizar
   participação", aquele código de acesso para de funcionar; só o painel admin pode reverter
   isso.
-- **Smoke tests end-to-end (Playwright) ainda não existem** — ver
+- **Smoke tests end-to-end (Playwright) ainda não existem** - ver
   [Testes Automatizados](#testes-automatizados). É a única lacuna de verificação automatizada
   conhecida no momento, e está deliberadamente agendada para antes do piloto, não antes.
 
 ## Privacidade e ética de pesquisa
 
 - `Usuario.codigo` é sempre um identificador arbitrário (`P[Iniciais]-[Sequencial]`) atribuído
-  pelo pesquisador — **o nome real do participante nunca é armazenado no banco de dados**.
+  pelo pesquisador, **o nome real do participante nunca é armazenado no banco de dados**.
   Qualquer vínculo entre código e identidade real (necessário, por exemplo, para o Termo de
   Consentimento Livre e Esclarecido) deve ficar em registro físico ou separado, fora deste
   sistema.
