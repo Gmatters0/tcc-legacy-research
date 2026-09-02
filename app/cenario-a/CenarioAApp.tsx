@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { SessaoProvider, useSessao } from "@/lib/instrumentation/SessaoProvider";
 import { classificarTipoErroPorMensagem } from "@/lib/instrumentation/erros";
@@ -39,6 +39,7 @@ const ITEM_VAZIO: ItemConferenciaA = {
 
 function CenarioAConteudo() {
   const { registrarErro, finalizarSessao } = useSessao();
+  const router = useRouter();
 
   const [numero, setNumero] = useState("");
   const [fornecedorCodigo, setFornecedorCodigo] = useState("");
@@ -163,6 +164,7 @@ function CenarioAConteudo() {
 
       setStatus("Concluído");
       await finalizarSessao();
+      router.push("/sucesso");
     } catch {
       errosColetados.push({ campo: "geral", mensagem: "Falha de comunicação com o servidor." });
     } finally {

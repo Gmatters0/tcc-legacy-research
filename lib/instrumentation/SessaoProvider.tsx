@@ -54,6 +54,24 @@ export function SessaoProvider({
     return () => window.removeEventListener("pagehide", handlePageHide);
   }, [sessaoId]);
 
+  useEffect(() => {
+    if (!sessaoId) return;
+
+    // Aviso nativo do navegador (texto genérico, não customizável) antes de
+    // recarregar/fechar durante uma sessão ativa. Não persiste dados — se o
+    // participante confirmar mesmo assim, o formulário volta em branco, como
+    // hoje. Navegação client-side (router.push, ex: para /sucesso) não passa
+    // por aqui — só reload/fechar aba/navegar para fora disparam beforeunload.
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (finalizada.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [sessaoId]);
+
   const value = useMemo(
     () => ({ sessaoId, cenario, registrarErro: registrar, finalizarSessao: finalizar }),
     [sessaoId, cenario, registrar, finalizar],

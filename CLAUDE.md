@@ -61,6 +61,7 @@ Todos via `pnpm` (nunca `npm`):
 | `pnpm exec prisma studio` | Abre GUI local para inspecionar o banco |
 | `pnpm run db:reset` | **Zera o banco de dados** (pede confirmação `CONFIRMAR`) |
 | `pnpm run db:reset -- --yes` | Zera o banco sem prompt (automação) |
+| `pnpm test` | Roda a suíte de testes automatizados (Vitest, ver seção "Testes Automatizados") |
 
 **Antes de qualquer coleta de dados real com participantes, rode `pnpm run db:reset`** para
 garantir que a base começa vazia — o script apaga `EventoErro`, `ItemRecebido`,
@@ -69,31 +70,67 @@ contagem antes/depois. Ver `scripts/reset-db.js`.
 
 O banco vive em `dev.db` (raiz do projeto, SQLite, gitignored — `DATABASE_URL="file:./dev.db"`
 em `.env`). Tudo roda localmente: o mesmo processo Next.js serve as páginas e as API Routes,
-sem backend separado.
+sem backend separado. `.env` também guarda `ADMIN_SENHA` (senha única do painel `/admin` — ver
+seção "Painel Administrativo"); **troque o valor placeholder antes de qualquer uso real**.
 
 ## Estrutura de Pastas
 
 ```
 /app
-  page.tsx                          → home (bootstrap de sessão: código do participante,
-                                       perfil, cenário, conjunto de tarefa → "Iniciar Tarefa")
+  page.tsx                          → home: gate de login (LoginForm) → setup da sessão
+                                       (IniciarTarefaForm: perfil, cenário, conjunto de tarefa
+                                       → "Iniciar Tarefa"). Participante não é mais texto livre,
+                                       vem do usuário autenticado.
+  /components
+    LoginForm.tsx                   → formulário de código + senha, POST /api/auth/login
+    IniciarTarefaForm.tsx           → formulário de setup pós-login + botão "sair"; pré-seleciona
+                                       e trava cenário/conjunto já concluídos (ver "Regra de
+                                       Não-Repetição"), ou mostra mensagem de participação
+                                       concluída se não sobra nenhuma combinação
+  /sucesso                          → tela de sucesso pós-baixa (client component; rota
+                                       protegida por proxy.ts — exige login), sem sessaoId no
+                                       state: "Voltar à tela inicial" ou "Finalizar participação"
+  /obrigado                         → tela de agradecimento final (server component estático,
+                                       NÃO protegida — o usuário já foi desativado e deslogado
+                                       antes de chegar aqui)
+  /admin                            → painel administrativo (ver seção "Painel Administrativo")
+    page.tsx                        → gate de login próprio (AdminLoginForm) → AdminDashboard
+    AdminDashboard.tsx              → orquestrador: busca sessões, botão "sair"
+    /components                     → AdminLoginForm, SessoesGrid, UsuariosPainel
   /api
+    /admin
+      login/route.ts                → POST valida ADMIN_SENHA e grava cookie httpOnly próprio
+      logout/route.ts                → POST apaga o cookie de admin
+      me/route.ts                    → GET 200/401 conforme sessão de admin válida
+      sessoes/route.ts               → GET todas as linhas de relatório (grid)
+      export/route.ts                → GET ?formato=csv|json&usuarioId= (opcional) — download
+      usuarios/route.ts               → GET lista usuários + histórico; POST cria usuário
+      usuarios/[id]/route.ts          → PATCH ativa/desativa usuário
+    /auth
+      login/route.ts                → POST autentica e grava cookie httpOnly de sessão
+      logout/route.ts                → POST apaga o cookie de sessão
+      me/route.ts                    → GET usuário autenticado (401 se não logado/inativo)
+      finalizar-participacao/route.ts → POST desativa o Usuario atual e encerra a sessão de
+                                       login (chamado a partir de /sucesso)
     /notas-fiscais
       route.ts                      → POST cria NF
       /[id]/route.ts                 → GET NF completa (itens + lançamentos)
       /[id]/itens/route.ts           → POST registra conferência (substitui itens da NF)
       /[id]/baixa/route.ts           → POST registra baixa em estoque
     /sessoes
-      route.ts                      → POST cria SessaoTeste + limpa sessões abandonadas
+      route.ts                      → POST cria SessaoTeste (exige login) + limpa sessões
+                                       abandonadas
       /[id]/route.ts                 → PATCH finaliza SessaoTeste (timestampFim)
       /[id]/abandonar/route.ts       → POST remove SessaoTeste não finalizada (via beacon)
     /eventos-erro/route.ts          → POST registra EventoErro
-  /cenario-a                        → tela única densa (client component)
+  /cenario-a                        → tela única densa (client component; rota protegida por
+                                       proxy.ts — exige login)
     CenarioAApp.tsx                 → orquestrador: estado, submit em lote, modais
     /components                     → TopNavBar, FooterFKeys, FieldsetValidacao,
                                        FieldsetConferencia, FieldsetBaixa, ErrorReviewModal,
                                        DepositoModal
-  /cenario-b                        → wizard de 3 passos, rota única, estado client-side
+  /cenario-b                        → wizard de 3 passos, rota única, estado client-side (rota
+                                       protegida por proxy.ts — exige login)
     CenarioBApp.tsx                 → orquestrador: passoAtual, maiorPassoAlcancado
     /components                     → TopAppBar, SideNavBar, Stepper, PassoValidacao,
                                        PassoConferencia, PassoBaixa
@@ -102,20 +139,49 @@ sem backend separado.
   task-config.ts                    → CENARIOS, CONJUNTOS_TAREFA, PERFIS_USUARIO,
                                        ARMAZENS_DISPONIVEIS (compartilhado entre A e B)
   api-response.ts                   → helper de resposta de erro estruturado da API
+  /auth                             → autenticação de participante (ver seção "Autenticação")
+    constants.ts                    → SESSAO_COOKIE_NAME (compartilhado entre session.ts e proxy.ts)
+    types.ts                        → UsuarioPublico (id, codigo — nunca senhaHash)
+    password.ts                     → hashSenha()/verificarSenha()/gerarSenhaAleatoria()
+                                       (node:crypto scrypt, sem dep. nova)
+    usuario.ts                      → autenticarUsuario(), buscarUsuarioAtivoPorId(),
+                                       desativarUsuario(), reativarUsuario(), listarUsuarios(),
+                                       criarUsuario() (código P[Iniciais]-[Sequencial] + senha)
+    session.ts                      → cookie de login (criarSessaoLogin, encerrarSessaoLogin,
+                                       obterUsuarioAutenticado) via next/headers
+  /admin                            → autenticação do painel admin — sem model próprio, um único
+                                       segredo local (ver seção "Painel Administrativo")
+    session.ts                      → cookie de admin verificado por HMAC contra ADMIN_SENHA
+                                       (stateless — sem tabela nem estado em memória)
   /business-logic                   → única fonte de regras de negócio (ver seção abaixo)
-    types.ts, notaFiscal.ts, conferencia.ts, estoque.ts
+    types.ts, notaFiscal.ts, conferencia.ts, estoque.ts, elegibilidade.ts (regra de
+    não-repetição — ver seção "Regra de Não-Repetição")
   /instrumentation                  → única fonte de instrumentação de métricas
     types.ts                        → enum TipoEventoErro, tipos de sessão
     session.ts                      → criarSessao(), finalizarSessao()
     erros.ts                        → registrarErro(), classificarTipoErroPorMensagem()
     heuristica.ts                   → pareceCampoTrocado() (heurística de ERRO_LOGICO_CADASTRO)
+    relatorio.ts                    → buscarLinhasRelatorio()/linhasParaCsv() — única fonte da
+                                       linha de relatório, usada pela grid e pelo export do admin
     SessaoProvider.tsx              → contexto React: sessaoId, registrarErro, finalizarSessao,
                                        limpeza via `pagehide` + sendBeacon
 /prisma
   schema.prisma
   /migrations
 /scripts
-  reset-db.js                       → zera o banco (ver Scripts de Execução acima)
+  reset-db.js                       → zera o banco (ver Scripts de Execução acima) — NÃO apaga
+                                       Usuario (credenciais de login não são dado de sessão de
+                                       teste, sobrevivem ao reset)
+  seed-usuario.js                   → cria um Usuario de teste local com código e senha
+                                       escolhidos à mão (ferramenta de dev, não passa pela
+                                       geração de código/senha do painel admin). Uso: `pnpm run
+                                       seed:usuario -- <codigo> <senha>`
+proxy.ts                            → (raiz do projeto) bloqueia acesso direto a /cenario-a e
+                                       /cenario-b sem cookie de sessão — checagem otimista, só
+                                       lê o cookie, não consulta o banco
+vitest.config.mts                   → config do Vitest (alias "@", ver "Testes Automatizados")
+*.test.ts                           → co-localizados com o arquivo testado, não numa pasta
+                                       __tests__ separada (ver "Testes Automatizados")
 ```
 
 ## Modelo de Dados (`prisma/schema.prisma`)
@@ -124,6 +190,15 @@ sem backend separado.
 enum PerfilUsuario {
   TECNICO
   NAO_TECNICO
+}
+
+model Usuario {
+  id        String        @id @default(cuid())
+  codigo    String        @unique // ex: "PJS-01" — NUNCA o nome real
+  senhaHash String
+  ativo     Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  sessoes   SessaoTeste[]
 }
 
 model NotaFiscal {
@@ -161,7 +236,8 @@ model LancamentoEstoque {
 
 model SessaoTeste {
   id              String        @id @default(cuid())
-  participanteId  String        // código do moderador (ex: "P01") — NUNCA o nome real
+  usuarioId       String
+  usuario         Usuario       @relation(fields: [usuarioId], references: [id])
   perfilUsuario   PerfilUsuario
   cenario         String        // "A" | "B"
   conjuntoTarefa  String
@@ -180,7 +256,7 @@ model EventoErro {
 }
 ```
 
-**Privacidade**: `participanteId` guarda só um código atribuído pelo moderador — identificação
+**Privacidade**: `Usuario.codigo` guarda só um código atribuído pelo moderador — identificação
 real (para TCLE) fica em registro físico/separado, nunca no banco.
 
 ## Fluxo de Negócio → API (idêntico nos dois cenários)
@@ -260,12 +336,167 @@ de erro estruturado da API é lida por completo — cada item de `erros[]` vira 
 "obrigat" → `INPUT_OBRIGATORIO_VAZIO`, senão → `ERRO_VALIDACAO_CAMPO`).
 
 **`ERRO_LOGICO_CADASTRO`** — dado tecnicamente aceito mas semanticamente incoerente (sistema
-não bloqueia, só sinaliza). Único ponto implementado hoje: `pareceCampoTrocado`
-(`lib/instrumentation/heuristica.ts`) detecta, no **Cenário A**, quando "Dep. Destino" não
-parece um código de armazém mas "Lote" parece — sinal de campos trocados. **Não existe
-detecção equivalente no Cenário B** — lá "Dep. Destino" é um `<select>` de opções fixas
-(prevenção de erro por design, não uma lacuna), então esse tipo de erro específico não pode
-acontecer ali. Ver "O que ainda falta" abaixo.
+não bloqueia, só sinaliza), `lib/instrumentation/heuristica.ts`:
+- **Cenário A**: `pareceCampoTrocado(armazem, lote)` — "Dep. Destino" não parece um código de
+  armazém mas "Lote" parece, sinal de campos trocados. Não existe equivalente para
+  Número da NF/Fornecedor em A (texto livre nos dois, mas essa dupla não é instrumentada aqui).
+- **Cenário B**: `fornecedorPareceNumeroNota(fornecedor)` — Fornecedor preenchido só com
+  dígitos, mesmo padrão do Número da NF. Não é uma heurística de "campo trocado" simétrica à
+  de A, porque Número da NF em B (e em A) já tem validação rígida (só dígitos) — não há como
+  esse campo "parecer" um nome de fornecedor, então o único sinal possível é o inverso.
+  "Dep. Destino" em B é um `<select>` de opções fixas (prevenção de erro por design), então a
+  heurística de armazém/lote de A não tem equivalente nem faz sentido em B.
+
+## Persistência de Navegação e Aviso de Reload
+
+Ponto 5 do pedido original tinha duas partes distintas, resolvidas de formas diferentes:
+
+- **Aviso de reload** — `lib/instrumentation/SessaoProvider.tsx` registra um listener de
+  `beforeunload` (além do `pagehide` já existente) enquanto a sessão está ativa
+  (`!finalizada.current`): chama `event.preventDefault()` para disparar o aviso **nativo** do
+  navegador (texto genérico, não customizável — nenhum framework permite estilizar essa caixa).
+  Não persiste nada — se o participante confirmar o reload mesmo assim, a página recarrega do
+  zero e todo o estado (React) some, como já acontecia antes. `router.push` (navegação
+  client-side, ex: para `/sucesso`) não passa por `beforeunload` — só reload/fechar aba/navegar
+  para fora disparam.
+- **Persistência ao navegar de volta** — só relevante no **Cenário B**: o Cenário A é uma tela
+  única sem navegação interna, então não há "voltar" a persistir ali. Em B, o Stepper
+  renderiza cada Passo condicionalmente (`{passoAtual === N && <PassoX />}`), então cada Passo
+  desmontava e perdia seu `useState` local toda vez que o participante saía dele. A correção
+  foi **elevar o estado dos três passos para `CenarioBApp.tsx`** (`formValidacao`,
+  `itensConferencia`, `formBaixa` — ver `app/cenario-b/types.ts`), que nunca desmonta durante o
+  fluxo — os três `PassoX` viraram componentes controlados (`value`/`onChange` via props, mesmo
+  padrão de `FieldsetValidacao` no Cenário A). Nenhum `sessionStorage`/`localStorage` é usado —
+  é só React state, o que também garante de graça que reload continua limpando tudo (o estado
+  vive na árvore de componentes, que reload sempre recria do zero).
+- **Efeito colateral corrigido**: antes dessa mudança, voltar ao Passo 1 depois de já ter
+  criado a NF e clicar "Próximo" de novo reenviava `POST /api/notas-fiscais`, o que falhava com
+  erro de número duplicado (bug documentado na antiga seção "Limitação conhecida"). Agora
+  `PassoValidacao` recebe a NF já criada (`notaFiscalExistente`) e, se ela existir, os campos
+  ficam somente leitura e "Próximo" só navega para o Passo 2 sem reenviar nada.
+
+## Autenticação
+
+Login simples de participante — código + senha, cookie httpOnly (`lib/auth/`):
+
+- `POST /api/auth/login` valida `Usuario.codigo` + `senhaHash` (verificação via
+  `node:crypto` scrypt em `lib/auth/password.ts` — sem dependência externa de hashing) e,
+  se o usuário existir e estiver `ativo`, grava um cookie httpOnly (`sessao_usuario`) com o
+  `id` do usuário. `POST /api/auth/logout` apaga o cookie. `GET /api/auth/me` devolve o
+  usuário autenticado ou 401.
+- **Duas camadas de checagem**, seguindo o padrão recomendado pela documentação do Next.js
+  para App Router: `proxy.ts` (raiz do projeto) faz a checagem **otimista** — só olha se o
+  cookie existe, sem consultar o banco — e redireciona para `/` quem tentar acessar
+  `/cenario-a` ou `/cenario-b` sem sessão. A checagem **autoritativa** (o usuário segue
+  `ativo`? o id do cookie existe de fato?) acontece em `lib/auth/session.ts` →
+  `obterUsuarioAutenticado()`, usada por `GET /api/auth/me` e por `POST /api/sessoes` (que
+  agora deriva `usuarioId` do cookie, nunca de um campo enviado pelo client).
+- A home (`app/page.tsx`) não tem mais campo livre de "Código do Participante": ela checa
+  `GET /api/auth/me` no mount e renderiza `LoginForm` (deslogado) ou `IniciarTarefaForm`
+  (logado, com botão "sair").
+- Criação de usuários tem UI própria no painel administrativo (ver "Painel Administrativo").
+  `scripts/seed-usuario.js` continua existindo à parte, só para dev (código e senha escolhidos
+  à mão, sem passar pela geração automática).
+- `desativarUsuario()` (`lib/auth/usuario.ts`) é chamada por
+  `POST /api/auth/finalizar-participacao` (ver "Telas de Encerramento") e pelo toggle manual do
+  painel admin — mesma função nos dois lugares. `reativarUsuario()` é usada só pelo admin.
+
+## Regra de Não-Repetição
+
+Um `Usuario` não pode concluir o teste duas vezes no mesmo cenário nem com o mesmo conjunto de
+tarefa (`lib/business-logic/elegibilidade.ts` — mesma convenção de `BusinessLogicError` usada
+no resto de `business-logic`, não é uma regra exclusiva de auth):
+
+- `buscarHistoricoParticipacao(usuarioId)` consulta `SessaoTeste` com `timestampFim` não nulo
+  do usuário e devolve os cenários e conjuntos de tarefa já concluídos.
+- **Duas camadas**, mesmo padrão da autenticação: `GET /api/auth/me` e `POST /api/auth/login`
+  devolvem esse histórico junto com a identidade (`UsuarioComHistorico`), e a home
+  (`IniciarTarefaForm`) usa isso para **pré-selecionar e travar** (`<select disabled>`) o
+  cenário/conjunto restante quando só sobra um — checagem **otimista**, só para guiar a UI. A
+  checagem **autoritativa** é `validarElegibilidade()`, chamada dentro de `POST /api/sessoes`
+  antes de criar a sessão — rejeita com `BusinessLogicError` mesmo que a UI tenha sido
+  contornada (DOM alterado, chamada direta à API).
+- Se não sobra nenhum cenário **ou** nenhum conjunto de tarefa disponível, a home mostra uma
+  mensagem de "participação concluída" no lugar do formulário. É um texto simples, não a tela
+  de agradecimento final planejada — essa é escopo das "Telas de encerramento" (ver "O que
+  ainda falta implementar").
+
+## Telas de Encerramento
+
+Ao concluir a Baixa em Estoque com sucesso, os dois cenários navegam para a mesma tela
+compartilhada — não há versão "estilo Cenário A" vs. "estilo Cenário B" aqui, porque a
+medição (Time-on-Task e eventos de erro) já termina em `finalizarSessao()`, antes do redirect;
+essas telas ficam fora do que está sendo comparado, então usam o visual neutro já usado pela
+home (zinc, sem referência de Figma):
+
+- **Cenário A** (`CenarioAApp.tsx`): depois de `finalizarSessao()` bem-sucedido em
+  `handleSalvar`, `router.push("/sucesso")`.
+- **Cenário B** (`CenarioBApp.tsx` → `PassoBaixa.tsx`): mesma coisa — o antigo card inline
+  "Entrada de mercadoria concluída" (mostrado dentro da própria tela) foi substituído por
+  navegação para `/sucesso`; o estado `concluido` que controlava esse card foi removido por
+  ficar morto depois da mudança.
+- **`/sucesso`**: duas opções. "Voltar à tela inicial" só faz `router.push("/")` — a home já
+  recalcula sozinha o que falta fazer (ver "Regra de Não-Repetição"), nenhuma lógica adicional
+  necessária aqui. "Finalizar participação" chama `POST /api/auth/finalizar-participacao`
+  (desativa o `Usuario` + encerra o cookie) e só então navega para `/obrigado`.
+- **`/obrigado`**: tela final, estática, deliberadamente **fora** do `matcher` de `proxy.ts` —
+  se fosse protegida, o redirect aconteceria antes do usuário conseguir ler a mensagem, já que
+  nesse ponto ele acabou de ser desautenticado.
+
+## Painel Administrativo
+
+Rota `/admin`, login próprio e separado do login de participante (`lib/admin/`):
+
+- **Sem model `Admin`**: é um segredo único, `ADMIN_SENHA` em `.env` (nunca commitado — troque
+  o placeholder antes de qualquer uso real). `POST /api/admin/login` compara a senha enviada
+  com `ADMIN_SENHA` e, se bater, grava um cookie httpOnly (`sessao_admin`) cujo valor é um
+  token HMAC-SHA256 derivado de `ADMIN_SENHA` (`lib/admin/session.ts`) — verificável de forma
+  **stateless** (recalcula e compara com `timingSafeEqual`), sem tabela nem estado em memória
+  do processo. `POST /api/admin/logout` apaga o cookie; `GET /api/admin/me` devolve 200/401.
+- `/admin` não passa pelo `proxy.ts` (que só cobre as rotas do participante) — faz seu próprio
+  gate client-side, mesmo padrão de `app/page.tsx`: checa `GET /api/admin/me` no mount e
+  renderiza `AdminLoginForm` ou `AdminDashboard`.
+- **Gestão de usuários** (`UsuariosPainel.tsx`): formulário cria um `Usuario` a partir só das
+  iniciais do participante — `criarUsuario()` (`lib/auth/usuario.ts`) monta o código
+  `P[Iniciais]-[Sequencial]` (sequencial reinicia por grupo de iniciais, não é um contador
+  global) e gera a senha com `gerarSenhaAleatoria()` (`lib/auth/password.ts`, alfabeto sem
+  `0/O/1/l/I` para evitar ambiguidade na leitura). A senha só existe em texto puro na resposta
+  dessa chamada — é exibida uma vez na UI, nunca mais recuperável depois (só o hash fica no
+  banco). A lista mostra status (ativo/inativo, toggle via `PATCH /api/admin/usuarios/[id]`
+  reaproveitando `desativarUsuario`/`reativarUsuario`) e o histórico de cenários/conjuntos já
+  concluídos (reaproveita `buscarHistoricoParticipacao`, mesma função da regra de não-repetição).
+- **Grid de sessões** (`SessoesGrid.tsx`) e **export** (`/api/admin/export`) compartilham a
+  mesma fonte de dados — `buscarLinhasRelatorio()` (`lib/instrumentation/relatorio.ts`) — para
+  a grid nunca divergir do que é exportado. Cada linha tem duração calculada
+  (`timestampFim - timestampInicio`) e contagem de `EventoErro` por `TipoEventoErro`. O export
+  aceita `?formato=csv|json` e `?usuarioId=` opcional (tudo vs. por participante), respondendo
+  com `Content-Disposition: attachment` para o navegador baixar direto ao clicar no link — sem
+  JS extra do lado do cliente.
+
+## Testes Automatizados
+
+**Vitest** (`vitest.config.mts`), sem Jest/Playwright ainda — decisão registrada após pesquisa
+comparativa (ESM nativo combina melhor com Turbopack; Playwright fica para os smoke tests
+ponta a ponta, deliberadamente adiados para **rodar só antes do primeiro teste piloto com
+participante real**, não fazem parte desta rodada).
+
+- **Arquivos `*.test.ts` co-localizados** com o código que testam (ex:
+  `lib/business-logic/conferencia.test.ts` ao lado de `conferencia.ts`) — sem pasta
+  `__tests__` separada.
+- **Cobertura atual**: funções puras (`calcularDivergencia`, `validarElegibilidade`,
+  `classificarTipoErroPorMensagem`, `pareceCampoTrocado`, `fornecedorPareceNumeroNota`,
+  `hashSenha`/`verificarSenha`/`gerarSenhaAleatoria`) e os caminhos de **rejeição de
+  validação** de `criarNotaFiscal`, `registrarConferenciaItens` e `registrarBaixaEstoque` —
+  esses três lançam `BusinessLogicError` antes de qualquer `await prisma...`, então não
+  precisam mockar nada nem tocam no banco real.
+- **Mock do Prisma** (`vi.mock("@/lib/prisma", ...)`) só onde o teste precisa mesmo passar por
+  uma consulta — `criarUsuario` (o algoritmo de sequencial por grupo de iniciais, apontado como
+  ponto de risco na pesquisa da Sprint de testes), `autenticarUsuario` e
+  `buscarHistoricoParticipacao`. Nenhum teste grava no `dev.db` real.
+- **Deliberadamente fora desta rodada**: os caminhos de sucesso (`create`/`update` reais) de
+  `criarNotaFiscal`, `registrarConferenciaItens` e `registrarBaixaEstoque`, e qualquer teste de
+  UI/E2E — ficam cobertos depois pelos smoke tests do Playwright (login → tarefa completa →
+  `/sucesso`, em cada cenário), a rodar antes do piloto.
 
 ## Design de Referência (Figma)
 
@@ -298,8 +529,24 @@ export de assets).
   subrotas), usada identicamente pelos dois cenários.
 - Instrumentação completa: cronômetro (início/fim), os 4 tipos de `EventoErro`, limpeza de
   sessões abandonadas (beacon + rede de segurança server-side).
-- Home page com bootstrap de sessão (código do participante, perfil, cenário, conjunto de
-  tarefa).
+- Autenticação de participante (login por código + senha, cookie httpOnly, proteção de
+  `/cenario-a` e `/cenario-b` via `proxy.ts`) — ver seção "Autenticação".
+- Regra de não-repetição por cenário e conjunto de tarefa (pré-seleção/trava na home + rejeição
+  no servidor) — ver seção "Regra de Não-Repetição".
+- Home page com login e, após autenticado, setup de sessão (perfil, cenário, conjunto de
+  tarefa) — cenário e conjunto já concluídos vêm travados; se não sobra nada, mostra mensagem
+  de participação concluída.
+- Telas de encerramento: `/sucesso` (voltar à home ou finalizar participação, com desativação
+  automática do `Usuario`) e `/obrigado` (agradecimento final) — ver seção "Telas de
+  Encerramento".
+- Painel administrativo (`/admin`, login próprio via `ADMIN_SENHA`): grid de sessões com
+  duração e erros por tipo, export CSV/JSON (tudo ou por participante), criação de `Usuario`
+  com código/senha gerados automaticamente, ativar/desativar manual — ver seção "Painel
+  Administrativo".
+- Persistência de navegação no Cenário B (estado dos 3 passos elevado, sem perder dados ao usar
+  o Stepper para voltar) e aviso nativo de reload em ambos os cenários — ver seção
+  "Persistência de Navegação e Aviso de Reload".
+- Heurística `ERRO_LOGICO_CADASTRO` também no Cenário B (Fornecedor parecendo um Nº de NF).
 - Cenário A completo: tela densa, TopNavBar, FooterFKeys (F2 funcional), 3 seções com
   inserção manual de itens, modal de seleção de depósito, fluxo de erro em 2 modais
   (confirmar → log completo).
@@ -311,31 +558,17 @@ export de assets).
   real.
 - Verificação funcional completa (type-check, lint e fluxo ponta a ponta) rodada ao vivo em
   ambos os cenários após cada rodada de mudanças.
+- Testes automatizados unitários (Vitest) das camadas `business-logic`, `instrumentation` e
+  `auth` — ver seção "Testes Automatizados".
 
 ## O que ainda falta implementar (fora de escopo até agora)
 
 Itens explicitamente adiados desde o pedido original, ainda não implementados:
 
-- **Exportação de dados** para análise estatística (hoje só é possível consultar o SQLite
-  diretamente ou via `prisma studio`).
-- **Autenticação de usuário** (a home hoje não tem controle de acesso — qualquer pessoa com
-  o link pode iniciar uma sessão).
 - **Carregamento real dos conjuntos de tarefas de teste**: `CONJUNTOS_TAREFA` em
-  `lib/task-config.ts` é hoje só uma lista fixa de rótulos ("Conjunto de Tarefas 1/2") — o
-  conteúdo/instruções de cada conjunto de tarefa ainda não existe e precisa entrar via
-  seed/fixture.
-
-Lacuna identificada na auditoria de instrumentação e ainda sem decisão do pesquisador:
-
-- **`ERRO_LOGICO_CADASTRO` no Cenário B**: não há nenhum ponto de disparo hoje (só existe a
-  heurística de armazém/lote trocados, exclusiva do Cenário A). Fica em aberto se vale a pena
-  adicionar uma heurística equivalente para Número da NF / Fornecedor trocados (ambos texto
-  livre, nos dois cenários) para dar cobertura desse tipo de erro também em B.
-
-Limitação conhecida, não corrigida por ser considerada fora do escopo atual:
-
-- Navegar de volta a um passo já preenchido (via "Anterior" ou pelo Stepper, no Cenário B, ou
-  reload de página) não restaura os dados já digitados — o formulário volta em branco, embora
-  a `NotaFiscal` já criada continue no banco. Resubmeter o Passo 1 com o mesmo número de NF
-  gera erro de duplicidade (comportamento correto da regra de negócio, mas pode confundir
-  durante testes manuais).
+  `lib/task-config.ts` é hoje só uma lista fixa de rótulos ("Conjunto de Tarefas 1/2"). O
+  conteúdo de cada conjunto (duas NFs de exemplo, com itens e divergências propositais) já foi
+  definido pelo pesquisador, mas por decisão dele é entregue ao participante fora do app
+  (impresso/verbal) — não precisa de UI própria, só documentação externa ao repositório.
+- **Smoke tests E2E (Playwright)**: adiados de propósito — rodar antes do primeiro teste piloto
+  com participante real, não antes. Ver "Testes Automatizados".

@@ -5,19 +5,14 @@ import { AlertTriangle, CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { useSessao } from "@/lib/instrumentation/SessaoProvider";
 import { classificarTipoErroPorMensagem } from "@/lib/instrumentation/erros";
 import { TipoEventoErro } from "@/lib/instrumentation/types";
+import type { ItemConferencia } from "../types";
 
 interface Props {
   notaFiscalId: string;
+  itens: ItemConferencia[];
+  onChangeItens: (itens: ItemConferencia[]) => void;
   onVoltar: () => void;
   onConcluido: (quantidadeTotal: number) => void;
-}
-
-interface ItemConferencia {
-  codigo: string;
-  descricao: string;
-  qtdPedidaTexto: string;
-  qtdRecebidaTexto: string;
-  unidade: string;
 }
 
 const ITEM_VAZIO: ItemConferencia = {
@@ -41,9 +36,8 @@ function paraQuantidade(texto: string): number | undefined {
   return texto.trim() === "" ? undefined : Number(texto);
 }
 
-export function PassoConferencia({ notaFiscalId, onVoltar, onConcluido }: Props) {
+export function PassoConferencia({ notaFiscalId, itens, onChangeItens, onVoltar, onConcluido }: Props) {
   const { registrarErro } = useSessao();
-  const [itens, setItens] = useState<ItemConferencia[]>([]);
   const [erros, setErros] = useState<string[]>([]);
   const [enviando, setEnviando] = useState(false);
 
@@ -57,15 +51,15 @@ export function PassoConferencia({ notaFiscalId, onVoltar, onConcluido }: Props)
   );
 
   function adicionarItem() {
-    setItens((prev) => [...prev, { ...ITEM_VAZIO }]);
+    onChangeItens([...itens, { ...ITEM_VAZIO }]);
   }
 
   function removerItem(index: number) {
-    setItens((prev) => prev.filter((_, i) => i !== index));
+    onChangeItens(itens.filter((_, i) => i !== index));
   }
 
   function alterarItem(index: number, campo: keyof ItemConferencia, valor: string) {
-    setItens((prev) => prev.map((item, i) => (i === index ? { ...item, [campo]: valor } : item)));
+    onChangeItens(itens.map((item, i) => (i === index ? { ...item, [campo]: valor } : item)));
   }
 
   function validarCampoEmBlur(index: number, campo: keyof ItemConferencia, valor: string) {

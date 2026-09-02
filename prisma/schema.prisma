@@ -15,6 +15,15 @@ enum PerfilUsuario {
   NAO_TECNICO
 }
 
+model Usuario {
+  id        String        @id @default(cuid())
+  codigo    String        @unique
+  senhaHash String
+  ativo     Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  sessoes   SessaoTeste[]
+}
+
 model NotaFiscal {
   id                 String              @id @default(cuid())
   numero             String              @unique
@@ -50,7 +59,8 @@ model LancamentoEstoque {
 
 model SessaoTeste {
   id              String        @id @default(cuid())
-  participanteId  String
+  usuarioId       String
+  usuario         Usuario       @relation(fields: [usuarioId], references: [id])
   perfilUsuario   PerfilUsuario
   cenario         String
   conjuntoTarefa  String

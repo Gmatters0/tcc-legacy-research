@@ -1,7 +1,6 @@
 import { PerfilUsuario, SessaoTeste } from "./types";
 
 export interface CriarSessaoInput {
-  participanteId: string;
   perfilUsuario: PerfilUsuario;
   cenario: string;
   conjuntoTarefa: string;
@@ -14,7 +13,8 @@ export async function criarSessao(input: CriarSessaoInput): Promise<SessaoTeste>
     body: JSON.stringify(input),
   });
   if (!response.ok) {
-    throw new Error("Não foi possível iniciar a sessão de teste.");
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.erros?.[0]?.mensagem ?? "Não foi possível iniciar a sessão de teste.");
   }
   return response.json();
 }

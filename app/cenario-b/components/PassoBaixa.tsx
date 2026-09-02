@@ -6,22 +6,32 @@ import { useSessao } from "@/lib/instrumentation/SessaoProvider";
 import { classificarTipoErroPorMensagem } from "@/lib/instrumentation/erros";
 import { TipoEventoErro } from "@/lib/instrumentation/types";
 import { ARMAZENS_DISPONIVEIS } from "@/lib/task-config";
-import type { NotaFiscalResumo } from "../types";
+import type { FormBaixa, NotaFiscalResumo } from "../types";
 
 interface Props {
   notaFiscal: NotaFiscalResumo;
   quantidadeSugerida: number;
+  form: FormBaixa;
+  onChangeForm: (form: FormBaixa) => void;
   onVoltar: () => void;
   onConcluido: () => void;
 }
 
-export function PassoBaixa({ notaFiscal, quantidadeSugerida, onVoltar, onConcluido }: Props) {
+export function PassoBaixa({ notaFiscal, quantidadeSugerida, form, onChangeForm, onVoltar, onConcluido }: Props) {
   const { registrarErro, finalizarSessao } = useSessao();
-  const [armazem, setArmazem] = useState("");
-  const [lote, setLote] = useState("");
-  const [quantidade, setQuantidade] = useState(String(quantidadeSugerida));
+  const { armazem, lote, quantidade } = form;
   const [erros, setErros] = useState<string[]>([]);
   const [enviando, setEnviando] = useState(false);
+
+  function setArmazem(valor: string) {
+    onChangeForm({ ...form, armazem: valor });
+  }
+  function setLote(valor: string) {
+    onChangeForm({ ...form, lote: valor });
+  }
+  function setQuantidade(valor: string) {
+    onChangeForm({ ...form, quantidade: valor });
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();

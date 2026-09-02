@@ -1,8 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
 import { SessaoProvider, useSessao } from "@/lib/instrumentation/SessaoProvider";
 import { TipoEventoErro } from "@/lib/instrumentation/types";
 import { TopAppBar } from "./components/TopAppBar";
@@ -11,16 +10,26 @@ import { Stepper } from "./components/Stepper";
 import { PassoValidacao } from "./components/PassoValidacao";
 import { PassoConferencia } from "./components/PassoConferencia";
 import { PassoBaixa } from "./components/PassoBaixa";
-import type { NotaFiscalResumo } from "./types";
+import type { FormBaixa, FormValidacao, ItemConferencia, NotaFiscalResumo } from "./types";
+
+const FORM_VALIDACAO_INICIAL: FormValidacao = { numero: "", fornecedor: "", dataEmissao: "", valorTotal: "" };
+const FORM_BAIXA_INICIAL: FormBaixa = { armazem: "", lote: "", quantidade: "" };
 
 function CenarioBConteudo() {
   const { registrarErro } = useSessao();
+  const router = useRouter();
 
   const [passoAtual, setPassoAtual] = useState(1);
   const [notaFiscal, setNotaFiscal] = useState<NotaFiscalResumo | null>(null);
   const [conferenciaConcluida, setConferenciaConcluida] = useState(false);
   const [quantidadeConferida, setQuantidadeConferida] = useState(0);
-  const [concluido, setConcluido] = useState(false);
+
+  // Estado dos três passos elevado até aqui (ver comentário em types.ts) — cada
+  // Passo é renderizado condicionalmente e desmontaria ao navegar para outro,
+  // então precisa viver num componente que nunca desmonta durante o fluxo.
+  const [formValidacao, setFormValidacao] = useState<FormValidacao>(FORM_VALIDACAO_INICIAL);
+  const [itensConferencia, setItensConferencia] = useState<ItemConferencia[]>([]);
+  const [formBaixa, setFormBaixa] = useState<FormBaixa>(FORM_BAIXA_INICIAL);
 
   // Passo 2 só é alcançável depois que a NF existe (passo 1 concluído); passo
   // 3 só depois que a conferência foi confirmada (passo 2 concluído) — um
@@ -51,46 +60,45 @@ function CenarioBConteudo() {
             <p className="text-sm text-[#434655]">Recebimento, conferência e baixa em estoque da nota fiscal.</p>
           </div>
 
-          {!concluido && <Stepper passoAtual={passoAtual} onNavegar={handleNavegarPasso} />}
+          <Stepper passoAtual={passoAtual} onNavegar={handleNavegarPasso} />
 
-          {concluido && notaFiscal ? (
-            <div className="flex w-full max-w-[672px] flex-col items-center gap-3 rounded-xl border border-[#c3c6d7] bg-white p-10 text-center shadow-sm">
-              <CheckCircle2 className="h-10 w-10 text-[#16a34a]" />
-              <h2 className="text-lg font-semibold text-[#191b23]">Entrada de mercadoria concluída</h2>
-              <p className="text-sm text-[#434655]">
-                A NF #{notaFiscal.numero} foi conferida e a baixa em estoque foi registrada com sucesso.
-              </p>
-            </div>
-          ) : (
-            <>
-              {passoAtual === 1 && (
-                <PassoValidacao
-                  onConcluido={(nota) => {
-                    setNotaFiscal(nota);
-                    setPassoAtual(2);
-                  }}
-                />
-              )}
-              {passoAtual === 2 && notaFiscal && (
-                <PassoConferencia
-                  notaFiscalId={notaFiscal.id}
-                  onVoltar={() => setPassoAtual(1)}
-                  onConcluido={(quantidadeTotal) => {
-                    setQuantidadeConferida(quantidadeTotal);
-                    setConferenciaConcluida(true);
-                    setPassoAtual(3);
-                  }}
-                />
-              )}
-              {passoAtual === 3 && notaFiscal && (
-                <PassoBaixa
-                  notaFiscal={notaFiscal}
-                  quantidadeSugerida={quantidadeConferida}
-                  onVoltar={() => setPassoAtual(2)}
-                  onConcluido={() => setConcluido(true)}
-                />
-              )}
-            </>
+          {passoAtual === 1 && (
+            <PassoValidacao
+              form={formValidacao}
+              onChangeForm={setFormValidacao}
+              notaFiscalExistente={notaFiscal}
+              onConcluido={(nota) => {
+                setNotaFiscal(nota);
+                setPassoAtual(2);
+              }}
+            />
+          )}
+          {passoAtual === 2 && notaFiscal && (
+            <PassoConferencia
+              notaFiscalId={notaFiscal.id}
+              itens={itensConferencia}
+              onChangeItens={setItensConferencia}
+              onVoltar={() => setPassoAtual(1)}
+              onConcluido={(quantidadeTotal) => {
+                setQuantidadeConferida(quantidadeTotal);
+                setConferenciaConcluida(true);
+                // Só sugere a quantidade da conferência na primeira chegada ao
+                // passo 3 — se o participante já tinha editado e voltou, o que
+                // ele digitou não é sobrescrito.
+                setFormBaixa((prev) => (prev.quantidade === "" ? { ...prev, quantidade: String(quantidadeTotal) } : prev));
+                setPassoAtual(3);
+              }}
+            />
+          )}
+          {passoAtual === 3 && notaFiscal && (
+            <PassoBaixa
+              notaFiscal={notaFiscal}
+              quantidadeSugerida={quantidadeConferida}
+              form={formBaixa}
+              onChangeForm={setFormBaixa}
+              onVoltar={() => setPassoAtual(2)}
+              onConcluido={() => router.push("/sucesso")}
+            />
           )}
         </main>
       </div>

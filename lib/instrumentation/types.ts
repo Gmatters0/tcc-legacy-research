@@ -11,7 +11,7 @@ export type PerfilUsuario = "TECNICO" | "NAO_TECNICO";
 
 export interface SessaoTeste {
   id: string;
-  participanteId: string;
+  usuarioId: string;
   perfilUsuario: PerfilUsuario;
   cenario: string;
   conjuntoTarefa: string;

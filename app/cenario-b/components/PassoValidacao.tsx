@@ -4,29 +4,32 @@ import { useState, type FormEvent } from "react";
 import { Info } from "lucide-react";
 import { useSessao } from "@/lib/instrumentation/SessaoProvider";
 import { classificarTipoErroPorMensagem } from "@/lib/instrumentation/erros";
+import { fornecedorPareceNumeroNota } from "@/lib/instrumentation/heuristica";
 import { TipoEventoErro } from "@/lib/instrumentation/types";
-import type { NotaFiscalResumo } from "../types";
+import type { FormValidacao, NotaFiscalResumo } from "../types";
 
 interface Props {
+  form: FormValidacao;
+  onChangeForm: (form: FormValidacao) => void;
+  notaFiscalExistente: NotaFiscalResumo | null;
   onConcluido: (notaFiscal: NotaFiscalResumo) => void;
 }
 
-interface FormState {
-  numero: string;
-  fornecedor: string;
-  dataEmissao: string;
-  valorTotal: string;
-}
-
-const VALOR_INICIAL: FormState = { numero: "", fornecedor: "", dataEmissao: "", valorTotal: "" };
-
-export function PassoValidacao({ onConcluido }: Props) {
+export function PassoValidacao({ form, onChangeForm, notaFiscalExistente, onConcluido }: Props) {
   const { registrarErro } = useSessao();
-  const [form, setForm] = useState<FormState>(VALOR_INICIAL);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [enviando, setEnviando] = useState(false);
 
-  function validarCampo(campo: keyof FormState, valor: string) {
+  // NF já foi criada (participante voltou ao Passo 1 e está revisando) — os
+  // campos viram somente leitura e "Próximo" só navega, sem reenviar ao
+  // servidor (evita tentar criar uma segunda NF com o mesmo número).
+  const somenteLeitura = notaFiscalExistente !== null;
+
+  function alterarCampo(campo: keyof FormValidacao, valor: string) {
+    onChangeForm({ ...form, [campo]: valor });
+  }
+
+  function validarCampo(campo: keyof FormValidacao, valor: string) {
     if (!valor.trim()) {
       registrarErro(TipoEventoErro.INPUT_OBRIGATORIO_VAZIO, `cenario-b/validacao.${campo}`);
       return "Campo obrigatório.";
@@ -49,7 +52,8 @@ export function PassoValidacao({ onConcluido }: Props) {
     return "";
   }
 
-  function handleBlur(campo: keyof FormState) {
+  function handleBlur(campo: keyof FormValidacao) {
+    if (somenteLeitura) return;
     const mensagem = validarCampo(campo, form[campo]);
     setErros((prev) => ({ ...prev, [campo]: mensagem }));
   }
@@ -57,13 +61,22 @@ export function PassoValidacao({ onConcluido }: Props) {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
+    if (notaFiscalExistente) {
+      onConcluido(notaFiscalExistente);
+      return;
+    }
+
     const novosErros: Record<string, string> = {};
-    (Object.keys(form) as (keyof FormState)[]).forEach((campo) => {
+    (Object.keys(form) as (keyof FormValidacao)[]).forEach((campo) => {
       const mensagem = validarCampo(campo, form[campo]);
       if (mensagem) novosErros[campo] = mensagem;
     });
     setErros(novosErros);
     if (Object.keys(novosErros).length) return;
+
+    if (fornecedorPareceNumeroNota(form.fornecedor)) {
+      registrarErro(TipoEventoErro.ERRO_LOGICO_CADASTRO, `fornecedor="${form.fornecedor}"`);
+    }
 
     setEnviando(true);
     try {
@@ -100,6 +113,11 @@ export function PassoValidacao({ onConcluido }: Props) {
     >
       <div className="border-b border-[#c3c6d7] bg-[#f3f3fe] px-6 py-6">
         <h2 className="text-xl font-semibold text-[#191b23]">Validação da Nota Fiscal</h2>
+        {somenteLeitura && (
+          <p className="mt-1 text-xs text-[#434655]">
+            Esta nota fiscal já foi registrada — os campos abaixo são só para conferência.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-6 p-6">
@@ -111,11 +129,12 @@ export function PassoValidacao({ onConcluido }: Props) {
           <input
             type="text"
             value={form.numero}
-            onChange={(e) => setForm((prev) => ({ ...prev, numero: e.target.value }))}
+            onChange={(e) => alterarCampo("numero", e.target.value)}
             onBlur={() => handleBlur("numero")}
+            readOnly={somenteLeitura}
             className={`rounded-lg border px-4 py-2 text-sm text-[#191b23] focus:outline-none ${
-              erros.numero ? "border-red-500" : "border-[#c3c6d7]"
-            }`}
+              somenteLeitura ? "bg-[#f3f4f6]" : ""
+            } ${erros.numero ? "border-red-500" : "border-[#c3c6d7]"}`}
             placeholder="Ex: 4052"
           />
           {erros.numero && <p className="text-xs text-red-600">{erros.numero}</p>}
@@ -126,11 +145,12 @@ export function PassoValidacao({ onConcluido }: Props) {
           <input
             type="text"
             value={form.fornecedor}
-            onChange={(e) => setForm((prev) => ({ ...prev, fornecedor: e.target.value }))}
+            onChange={(e) => alterarCampo("fornecedor", e.target.value)}
             onBlur={() => handleBlur("fornecedor")}
+            readOnly={somenteLeitura}
             className={`rounded-lg border px-4 py-2 text-sm text-[#191b23] focus:outline-none ${
-              erros.fornecedor ? "border-red-500" : "border-[#c3c6d7]"
-            }`}
+              somenteLeitura ? "bg-[#f3f4f6]" : ""
+            } ${erros.fornecedor ? "border-red-500" : "border-[#c3c6d7]"}`}
             placeholder="Ex: TechSupplies Ind. Ltda."
           />
           {erros.fornecedor && <p className="text-xs text-red-600">{erros.fornecedor}</p>}
@@ -141,11 +161,12 @@ export function PassoValidacao({ onConcluido }: Props) {
           <input
             type="date"
             value={form.dataEmissao}
-            onChange={(e) => setForm((prev) => ({ ...prev, dataEmissao: e.target.value }))}
+            onChange={(e) => alterarCampo("dataEmissao", e.target.value)}
             onBlur={() => handleBlur("dataEmissao")}
+            readOnly={somenteLeitura}
             className={`rounded-lg border px-4 py-2 text-sm text-[#191b23] focus:outline-none ${
-              erros.dataEmissao ? "border-red-500" : "border-[#c3c6d7]"
-            }`}
+              somenteLeitura ? "bg-[#f3f4f6]" : ""
+            } ${erros.dataEmissao ? "border-red-500" : "border-[#c3c6d7]"}`}
           />
           {erros.dataEmissao && <p className="text-xs text-red-600">{erros.dataEmissao}</p>}
         </div>
@@ -155,11 +176,12 @@ export function PassoValidacao({ onConcluido }: Props) {
           <input
             type="text"
             value={form.valorTotal}
-            onChange={(e) => setForm((prev) => ({ ...prev, valorTotal: e.target.value }))}
+            onChange={(e) => alterarCampo("valorTotal", e.target.value)}
             onBlur={() => handleBlur("valorTotal")}
+            readOnly={somenteLeitura}
             className={`rounded-lg border px-4 py-2 text-sm text-[#191b23] focus:outline-none ${
-              erros.valorTotal ? "border-red-500" : "border-[#c3c6d7]"
-            }`}
+              somenteLeitura ? "bg-[#f3f4f6]" : ""
+            } ${erros.valorTotal ? "border-red-500" : "border-[#c3c6d7]"}`}
             placeholder="Ex: 12450,00"
           />
           {erros.valorTotal && <p className="text-xs text-red-600">{erros.valorTotal}</p>}
