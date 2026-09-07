@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 const COOKIE_NAME = "sessao_admin";
-const COOKIE_MAX_AGE_SEGUNDOS = 60 * 60 * 12; // 12h — mesma janela do login de participante
 
 // Não há model Admin nem tabela própria — um único segredo local (ADMIN_SENHA
 // em .env). O cookie guarda um token derivado desse segredo via HMAC: dá pra
@@ -19,7 +18,9 @@ export async function criarSessaoAdmin(): Promise<void> {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: COOKIE_MAX_AGE_SEGUNDOS,
+    // Sem maxAge/expires de propósito: cookie de sessão do navegador — expira
+    // sempre que o navegador fecha, não fica "lembrado" entre reinícios. Acesso
+    // de admin é local ao pesquisador, sem tabela de usuário admin no banco.
   });
 }
 

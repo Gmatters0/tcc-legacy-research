@@ -3,7 +3,7 @@ import { SESSAO_COOKIE_NAME } from "./constants";
 import { buscarUsuarioAtivoPorId } from "./usuario";
 import { UsuarioPublico } from "./types";
 
-const COOKIE_MAX_AGE_SEGUNDOS = 60 * 60 * 12; // 12h — cobre uma sessão de teste presencial
+const COOKIE_MAX_AGE_SEGUNDOS = 60 * 60 * 12; // 12h — cobre uma sessão de teste, presencial ou remota
 
 export async function criarSessaoLogin(usuarioId: string): Promise<void> {
   const cookieStore = await cookies();

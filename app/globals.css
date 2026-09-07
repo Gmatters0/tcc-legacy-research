@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Tema fixo claro — nenhum componente do projeto usa variantes `dark:`, todas
+   as cores foram extraídas do Figma (ver CLAUDE.md, "Design de Referência")
+   assumindo fundo claro. Seguir o dark mode automático do SO aqui quebraria
+   qualquer tela cujo container raiz não defina o próprio fundo (foi o caso
+   real do painel admin: texto escuro sobre fundo que virava quase-preto). */
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -10,13 +15,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {

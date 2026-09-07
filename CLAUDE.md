@@ -389,8 +389,13 @@ Login simples de participante — código + senha, cookie httpOnly (`lib/auth/`)
   cookie existe, sem consultar o banco — e redireciona para `/` quem tentar acessar
   `/cenario-a` ou `/cenario-b` sem sessão. A checagem **autoritativa** (o usuário segue
   `ativo`? o id do cookie existe de fato?) acontece em `lib/auth/session.ts` →
-  `obterUsuarioAutenticado()`, usada por `GET /api/auth/me` e por `POST /api/sessoes` (que
-  agora deriva `usuarioId` do cookie, nunca de um campo enviado pelo client).
+  `obterUsuarioAutenticado()`, usada por `GET /api/auth/me` e por **toda** rota de negócio que
+  grava ou lê dado de participante — `POST /api/sessoes`, `/api/notas-fiscais` (e subrotas
+  `itens`/`baixa`), `PATCH /api/sessoes/[id]`, `POST /api/sessoes/[id]/abandonar` e
+  `POST /api/eventos-erro`. Antes só `POST /api/sessoes` checava isso — as demais confiavam só
+  na proteção de página do `proxy.ts`, o que não barra alguém chamando a API diretamente sem
+  nunca ter passado pela UI. Hospedar publicamente (Vercel) tornou isso um risco real, não só
+  teórico, daí a rodada de correção em todas essas rotas de uma vez.
 - A home (`app/page.tsx`) não tem mais campo livre de "Código do Participante": ela checa
   `GET /api/auth/me` no mount e renderiza `LoginForm` (deslogado) ou `IniciarTarefaForm`
   (logado, com botão "sair").
@@ -452,7 +457,12 @@ Rota `/admin`, login próprio e separado do login de participante (`lib/admin/`)
   com `ADMIN_SENHA` e, se bater, grava um cookie httpOnly (`sessao_admin`) cujo valor é um
   token HMAC-SHA256 derivado de `ADMIN_SENHA` (`lib/admin/session.ts`) — verificável de forma
   **stateless** (recalcula e compara com `timingSafeEqual`), sem tabela nem estado em memória
-  do processo. `POST /api/admin/logout` apaga o cookie; `GET /api/admin/me` devolve 200/401.
+  do processo. O cookie **não tem `maxAge`/`expires`** de propósito — é cookie de sessão do
+  navegador, sempre expira ao fechar o navegador, nunca fica "lembrado" entre reinícios (acesso
+  de admin é local ao pesquisador, sem cadastro de usuário admin no banco). `POST
+  /api/admin/logout` apaga o cookie; `GET /api/admin/me` devolve 200/401. As 4 rotas de dados
+  do admin (`sessoes`, `export`, `usuarios`, `usuarios/[id]`) já checavam
+  `estaAutenticadoComoAdmin()` desde que foram criadas.
 - `/admin` não passa pelo `proxy.ts` (que só cobre as rotas do participante) — faz seu próprio
   gate client-side, mesmo padrão de `app/page.tsx`: checa `GET /api/admin/me` no mount e
   renderiza `AdminLoginForm` ou `AdminDashboard`.
@@ -530,7 +540,8 @@ export de assets).
 - Instrumentação completa: cronômetro (início/fim), os 4 tipos de `EventoErro`, limpeza de
   sessões abandonadas (beacon + rede de segurança server-side).
 - Autenticação de participante (login por código + senha, cookie httpOnly, proteção de
-  `/cenario-a` e `/cenario-b` via `proxy.ts`) — ver seção "Autenticação".
+  `/cenario-a` e `/cenario-b` via `proxy.ts`, checagem de login em **todas** as rotas de
+  negócio, não só nas páginas) — ver seção "Autenticação".
 - Regra de não-repetição por cenário e conjunto de tarefa (pré-seleção/trava na home + rejeição
   no servidor) — ver seção "Regra de Não-Repetição".
 - Home page com login e, após autenticado, setup de sessão (perfil, cenário, conjunto de

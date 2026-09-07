@@ -25,7 +25,7 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 bg-zinc-50 px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-zinc-900">Painel Administrativo</h1>
         <button

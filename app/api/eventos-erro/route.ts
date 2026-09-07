@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { obterUsuarioAutenticado } from "@/lib/auth/session";
 
 export async function POST(request: NextRequest) {
+  if (!(await obterUsuarioAutenticado())) {
+    return NextResponse.json({ erros: [{ campo: "geral", mensagem: "Não autenticado." }] }, { status: 401 });
+  }
+
   const body = await request.json();
   const { sessaoId, tipo, detalhe } = body;
 
