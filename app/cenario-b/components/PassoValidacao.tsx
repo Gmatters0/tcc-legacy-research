@@ -211,7 +211,7 @@ export function PassoValidacao({ form, onChangeForm, notaFiscalExistente, onConc
         <button
           type="submit"
           disabled={enviando}
-          className="rounded-lg bg-[#004ac6] px-6 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-50"
+          className="rounded-lg bg-[#004ac6] px-6 py-2 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
           {enviando ? "Validando..." : "Próximo →"}
         </button>

@@ -192,7 +192,7 @@ function CenarioAConteudo() {
   });
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#dbdad9] text-[#1b1c1c]">
+    <div className="flex min-h-screen flex-col bg-[#dbdad9] text-[#1b1c1c] [&_button]:cursor-pointer">
       <TopNavBar onSalvar={handleSalvar} />
       <main className="flex flex-1 flex-col gap-2 overflow-auto bg-[#d2d2d2] p-1">
         <div className="border-b border-[#9ca3af] px-2 pb-1.5 pt-1">

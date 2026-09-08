@@ -265,7 +265,7 @@ export function PassoConferencia({ notaFiscalId, itens, onChangeItens, onVoltar,
           type="button"
           onClick={handleConfirmar}
           disabled={enviando}
-          className="rounded-lg bg-[#004ac6] px-6 py-2.5 text-sm font-medium text-white shadow-sm disabled:opacity-50"
+          className="rounded-lg bg-[#004ac6] px-6 py-2.5 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
           {enviando ? "Confirmando..." : "Próximo →"}
         </button>

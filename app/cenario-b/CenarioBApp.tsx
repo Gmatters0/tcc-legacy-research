@@ -49,7 +49,7 @@ function CenarioBConteudo() {
   }
 
   return (
-    <div className="min-h-screen bg-white pl-[260px]">
+    <div className="min-h-screen bg-white pl-[260px] [&_button:not(:disabled)]:cursor-pointer">
       <SideNavBar />
       <div className="flex min-h-screen flex-col">
         <TopAppBar />
