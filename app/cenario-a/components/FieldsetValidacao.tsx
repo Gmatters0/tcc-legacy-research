@@ -1,11 +1,10 @@
 "use client";
 
-type Campo = "numero" | "fornecedorCodigo" | "fornecedorNome" | "dataEmissao" | "valorTotal";
+type Campo = "numero" | "fornecedor" | "dataEmissao" | "valorTotal";
 
 interface Props {
   numero: string;
-  fornecedorCodigo: string;
-  fornecedorNome: string;
+  fornecedor: string;
   dataEmissao: string;
   valorTotal: string;
   onChange: (campo: Campo, valor: string) => void;
@@ -13,8 +12,7 @@ interface Props {
 
 export function FieldsetValidacao({
   numero,
-  fornecedorCodigo,
-  fornecedorNome,
+  fornecedor,
   dataEmissao,
   valorTotal,
   onChange,
@@ -36,15 +34,9 @@ export function FieldsetValidacao({
           Fornecedor:
           <input
             type="text"
-            value={fornecedorCodigo}
-            onChange={(e) => onChange("fornecedorCodigo", e.target.value)}
-            className="w-16 border border-[#6b7280] bg-white px-3 py-2 text-base text-[#1b1c1c] focus:outline-none"
-          />
-          <input
-            type="text"
-            value={fornecedorNome}
-            onChange={(e) => onChange("fornecedorNome", e.target.value)}
-            className="w-56 border border-[#6b7280] bg-[#f3f4f6] px-3 py-2 text-base text-[#1b1c1c] focus:outline-none"
+            value={fornecedor}
+            onChange={(e) => onChange("fornecedor", e.target.value)}
+            className="w-56 border border-[#6b7280] bg-white px-3 py-2 text-base text-[#1b1c1c] focus:outline-none"
           />
         </label>
         <label className="flex items-center gap-2 text-[11px] text-[#1b1c1c]">

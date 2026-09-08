@@ -21,10 +21,9 @@ test.describe("Cenário A — fluxo de sucesso", () => {
 
     const validacao = fieldset(page, "1. NF Validation").locator("input");
     await validacao.nth(0).fill(numero);
-    await validacao.nth(1).fill("001");
-    await validacao.nth(2).fill("Fornecedor Teste E2E");
-    await validacao.nth(3).fill("07.09.2026");
-    await validacao.nth(4).fill("1000,00");
+    await validacao.nth(1).fill("Fornecedor Teste E2E");
+    await validacao.nth(2).fill("07.09.2026");
+    await validacao.nth(3).fill("1000,00");
 
     await fieldset(page, "Conferência de Itens").getByRole("button", { name: "Novo" }).click();
     const itemInputs = fieldset(page, "Conferência de Itens").locator("tbody tr").first().locator("input");

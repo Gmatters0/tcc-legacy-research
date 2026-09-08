@@ -42,8 +42,7 @@ function CenarioAConteudo() {
   const router = useRouter();
 
   const [numero, setNumero] = useState("");
-  const [fornecedorCodigo, setFornecedorCodigo] = useState("");
-  const [fornecedorNome, setFornecedorNome] = useState("");
+  const [fornecedor, setFornecedor] = useState("");
   const [dataEmissao, setDataEmissao] = useState("");
   const [valorTotal, setValorTotal] = useState("");
 
@@ -61,12 +60,11 @@ function CenarioAConteudo() {
   const quantidadeLancar = itens.reduce((soma, item) => soma + (Number(item.qtdRecebidaTexto) || 0), 0);
 
   function handleAlterarCampoValidacao(
-    campo: "numero" | "fornecedorCodigo" | "fornecedorNome" | "dataEmissao" | "valorTotal",
+    campo: "numero" | "fornecedor" | "dataEmissao" | "valorTotal",
     valor: string,
   ) {
     if (campo === "numero") setNumero(valor);
-    if (campo === "fornecedorCodigo") setFornecedorCodigo(valor);
-    if (campo === "fornecedorNome") setFornecedorNome(valor);
+    if (campo === "fornecedor") setFornecedor(valor);
     if (campo === "dataEmissao") setDataEmissao(valor);
     if (campo === "valorTotal") setValorTotal(valor);
   }
@@ -121,7 +119,7 @@ function CenarioAConteudo() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           numero,
-          fornecedor: [fornecedorCodigo, fornecedorNome].filter(Boolean).join(" - "),
+          fornecedor,
           dataEmissao: paraIso(dataEmissao),
           valorTotal: paraQuantidade(valorTotal.replace(",", ".")),
         }),
@@ -186,8 +184,7 @@ function CenarioAConteudo() {
         <div className="flex flex-col gap-2 p-1">
           <FieldsetValidacao
             numero={numero}
-            fornecedorCodigo={fornecedorCodigo}
-            fornecedorNome={fornecedorNome}
+            fornecedor={fornecedor}
             dataEmissao={dataEmissao}
             valorTotal={valorTotal}
             onChange={handleAlterarCampoValidacao}
