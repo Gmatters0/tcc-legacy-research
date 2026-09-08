@@ -168,7 +168,7 @@ model Usuario {
 
 model NotaFiscal {
   id                 String              @id @default(cuid())
-  numero             String              @unique
+  numero             String
   fornecedor         String
   dataEmissao        DateTime
   valorTotal         Float
@@ -260,7 +260,7 @@ verdade é sempre a API.
 
 | Campo | Regra |
 |---|---|
-| `NotaFiscal.numero` | Obrigatório, único, **apenas dígitos** (`/^\d+$/`) |
+| `NotaFiscal.numero` | Obrigatório, **apenas dígitos** (`/^\d+$/`) — **não é único**: o mesmo conjunto de tarefa (mesmo número de NF) é reaplicado a cada participante, repetir entre sessões é esperado |
 | `NotaFiscal.fornecedor` | Obrigatório, qualquer caractere aceito |
 | `NotaFiscal.dataEmissao` | Obrigatória, precisa ser uma data válida |
 | `NotaFiscal.valorTotal` | Obrigatório, numérico, **pode ser zero** (ex.: item recebido como brinde/permuta), não pode ser negativo |
@@ -451,8 +451,9 @@ formas diferentes:
   não em cada passo individualmente — assim, usar o Stepper para ir e voltar entre passos já
   alcançados nunca perde o que foi digitado. Como efeito colateral positivo, isso também
   eliminou um bug conhecido: voltar ao primeiro passo depois de já ter criado a nota fiscal e
-  confirmar de novo não tenta mais recriar a NF (o que geraria um erro de número duplicado) —
-  o passo reconhece que a NF já existe e os campos ficam somente leitura.
+  confirmar de novo não tenta mais recriar a NF (o que criaria uma segunda `NotaFiscal`
+  duplicada pra mesma sessão) — o passo reconhece que a NF já existe e os campos ficam
+  somente leitura.
 
 ## Testes automatizados
 

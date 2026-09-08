@@ -261,7 +261,7 @@ model Usuario {
 
 model NotaFiscal {
   id                 String   @id @default(cuid())
-  numero             String   @unique
+  numero             String
   fornecedor         String
   dataEmissao        DateTime
   valorTotal         Float
@@ -333,7 +333,7 @@ parcialmente.
 
 | Campo | Regra |
 |---|---|
-| `NotaFiscal.numero` | obrigatório, único, **apenas dígitos** (`/^\d+$/`) |
+| `NotaFiscal.numero` | obrigatório, **apenas dígitos** (`/^\d+$/`) — **não é único**: o mesmo conjunto de tarefa (mesmo número de NF) é reaplicado a cada participante, repetir entre sessões é esperado |
 | `NotaFiscal.fornecedor` | obrigatório, **qualquer caractere aceito** |
 | `NotaFiscal.dataEmissao` | obrigatória, data válida |
 | `NotaFiscal.valorTotal` | obrigatório, numérico, **pode ser zero** (ex: item recebido como brinde/permuta), não pode ser negativo |
@@ -428,10 +428,11 @@ Ponto 5 do pedido original tinha duas partes distintas, resolvidas de formas dif
   é só React state, o que também garante de graça que reload continua limpando tudo (o estado
   vive na árvore de componentes, que reload sempre recria do zero).
 - **Efeito colateral corrigido**: antes dessa mudança, voltar ao Passo 1 depois de já ter
-  criado a NF e clicar "Próximo" de novo reenviava `POST /api/notas-fiscais`, o que falhava com
-  erro de número duplicado (bug documentado na antiga seção "Limitação conhecida"). Agora
-  `PassoValidacao` recebe a NF já criada (`notaFiscalExistente`) e, se ela existir, os campos
-  ficam somente leitura e "Próximo" só navega para o Passo 2 sem reenviar nada.
+  criado a NF e clicar "Próximo" de novo reenviava `POST /api/notas-fiscais`, criando uma
+  segunda `NotaFiscal` duplicada pra mesma sessão (bug documentado na antiga seção "Limitação
+  conhecida"). Agora `PassoValidacao` recebe a NF já criada (`notaFiscalExistente`) e, se ela
+  existir, os campos ficam somente leitura e "Próximo" só navega para o Passo 2 sem reenviar
+  nada.
 
 ## Autenticação
 

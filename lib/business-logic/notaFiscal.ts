@@ -29,23 +29,18 @@ function validarNotaFiscalInput(input: NotaFiscalInput) {
 export async function criarNotaFiscal(input: NotaFiscalInput) {
   validarNotaFiscalInput(input);
 
-  try {
-    return await prisma.notaFiscal.create({
-      data: {
-        numero: input.numero.trim(),
-        fornecedor: input.fornecedor.trim(),
-        dataEmissao: new Date(input.dataEmissao),
-        valorTotal: input.valorTotal,
-      },
-    });
-  } catch (err: unknown) {
-    if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "P2002") {
-      throw new BusinessLogicError([
-        { campo: "numero", mensagem: "Já existe uma nota fiscal cadastrada com este número." },
-      ]);
-    }
-    throw err;
-  }
+  // Número da NF não é único no banco de propósito: o mesmo conjunto de
+  // tarefa (mesmos números de NF) é reaplicado a cada participante do
+  // experimento, então repetir um número entre sessões diferentes é
+  // esperado, não um erro.
+  return prisma.notaFiscal.create({
+    data: {
+      numero: input.numero.trim(),
+      fornecedor: input.fornecedor.trim(),
+      dataEmissao: new Date(input.dataEmissao),
+      valorTotal: input.valorTotal,
+    },
+  });
 }
 
 export async function buscarNotaFiscal(id: string) {
