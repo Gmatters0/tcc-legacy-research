@@ -36,13 +36,15 @@ a regra, pois a lógica e os dados por trás continuam idênticos.
 ## Stack Técnica
 
 - **Next.js 16** (App Router) + **TypeScript** + **Tailwind CSS v4**
-- **Prisma 7** + **SQLite**, via driver adapter `@prisma/adapter-better-sqlite3` (Prisma 7 não
-  aceita mais conexão direta por `DATABASE_URL` sem adapter)
+- **Prisma 7** + **PostgreSQL** (Prisma Postgres, hospedado — provisionado via Management API,
+  região `us-east-1`), via driver adapter `@prisma/adapter-pg` + `pg` (Prisma 7 não aceita mais
+  conexão direta por `DATABASE_URL` sem adapter). **Já rodou como SQLite local
+  (`@prisma/adapter-better-sqlite3`) até a migração para hospedagem pública** — ver "Migração
+  SQLite → Postgres" logo abaixo se encontrar alguma referência antiga.
 - **lucide-react** para ícones (fidelidade visual próxima ao Figma sem custo de export de assets)
 - **pnpm** como gerenciador de pacotes (`packageManager: "pnpm@10.33.0"` fixado no
-  `package.json`) — **não usar `npm`**. Módulos nativos (`better-sqlite3`, engines do Prisma)
-  exigem aprovação de build scripts do pnpm, já configurada em `package.json` →
-  `pnpm.onlyBuiltDependencies`.
+  `package.json`) — **não usar `npm`**. Engines do Prisma exigem aprovação de build scripts do
+  pnpm, já configurada em `package.json` → `pnpm.onlyBuiltDependencies`.
 
 ## Scripts de Execução
 
@@ -68,10 +70,42 @@ garantir que a base começa vazia — o script apaga `EventoErro`, `ItemRecebido
 `LancamentoEstoque`, `NotaFiscal` e `SessaoTeste`, nessa ordem (respeita FKs), e mostra a
 contagem antes/depois. Ver `scripts/reset-db.js`.
 
-O banco vive em `dev.db` (raiz do projeto, SQLite, gitignored — `DATABASE_URL="file:./dev.db"`
-em `.env`). Tudo roda localmente: o mesmo processo Next.js serve as páginas e as API Routes,
-sem backend separado. `.env` também guarda `ADMIN_SENHA` (senha única do painel `/admin` — ver
-seção "Painel Administrativo"); **troque o valor placeholder antes de qualquer uso real**.
+O banco é um Postgres hospedado (Prisma Postgres) — `DATABASE_URL` em `.env` é a connection
+string completa (nunca commitada). O app em si não tem backend separado: o mesmo processo
+Next.js serve as páginas e as API Routes, só o banco é externo. `.env` também guarda
+`ADMIN_SENHA` (senha única do painel `/admin` — ver seção "Painel Administrativo"); **troque o
+valor placeholder antes de qualquer uso real**. Ver "Migração SQLite → Postgres" abaixo.
+
+## Migração SQLite → Postgres
+
+O projeto rodou 100% local em SQLite até a decisão de hospedar publicamente (Vercel + Prisma
+Postgres, não Prisma Compute — Compute exigiria Prisma 8, ainda em release candidate). O que
+mudou:
+
+- `prisma/schema.prisma`: `datasource db { provider = "sqlite" }` →
+  `provider = "postgresql"`. Nenhum campo do schema precisou mudar — todos os tipos usados
+  (`String`, `Float`, `Boolean`, `DateTime`, `cuid()`) já eram portáveis.
+- `lib/prisma.ts`: adapter trocado de `PrismaBetterSqlite3` para `PrismaPg` (`@prisma/adapter-pg`
+  + `pg`), com `new Pool({ connectionString: process.env.DATABASE_URL })`.
+- **Migrations antigas foram apagadas e recriadas do zero** (`prisma/migrations/`): o SQL de
+  uma migration é específico do dialeto do provider em que foi gerada (`migration_lock.toml`
+  trava isso) — as migrations SQLite não rodariam contra Postgres. Não havia dado real de
+  pesquisa em jogo (só dados de teste, sempre resetados), então a troca foi direta:
+  `rm -rf prisma/migrations && pnpm exec prisma migrate dev --name init`.
+- `scripts/reset-db.js` e `scripts/seed-usuario.js`: **reescritos de `better-sqlite3` para
+  `pg`**. Isso não foi só trocar a connection string — o gerador `provider = "prisma-client"`
+  do Prisma 7 emite **TypeScript fonte** (`app/generated/prisma/*.ts`), não `.js` compilado, e
+  scripts CommonJS simples (`node script.js`) não conseguem importar isso diretamente. Em vez
+  de adicionar um runtime TS (`tsx`) só para esses dois scripts, eles continuam sem Prisma
+  Client — usam `pg` cru direto (`Client`/`query`), mesmo estilo de sempre (SQL de baixo nível
+  contra o banco), só trocando o driver. Sintaxe SQL quase idêntica (Postgres também exige
+  aspas duplas para identificadores camelCase); a diferença real foi trocar a API síncrona do
+  `better-sqlite3` (`db.prepare().run()`) pela assíncrona do `pg` (`await client.query()`).
+- `better-sqlite3` e `@prisma/adapter-better-sqlite3` foram removidos do `package.json`
+  (nada mais depende deles) — junto com a entrada de `better-sqlite3` em
+  `pnpm.onlyBuiltDependencies`.
+- Banco provisionado via Management API do Prisma (`https://api.prisma.io/v1/projects`,
+  região `us-east-1` — sem região sul-americana disponível ainda), não pelo Console web.
 
 ## Estrutura de Pastas
 
@@ -502,7 +536,7 @@ participante real**, não fazem parte desta rodada).
 - **Mock do Prisma** (`vi.mock("@/lib/prisma", ...)`) só onde o teste precisa mesmo passar por
   uma consulta — `criarUsuario` (o algoritmo de sequencial por grupo de iniciais, apontado como
   ponto de risco na pesquisa da Sprint de testes), `autenticarUsuario` e
-  `buscarHistoricoParticipacao`. Nenhum teste grava no `dev.db` real.
+  `buscarHistoricoParticipacao`. Nenhum teste grava no banco Postgres real.
 - **Deliberadamente fora desta rodada**: os caminhos de sucesso (`create`/`update` reais) de
   `criarNotaFiscal`, `registrarConferenciaItens` e `registrarBaixaEstoque`, e qualquer teste de
   UI/E2E — ficam cobertos depois pelos smoke tests do Playwright (login → tarefa completa →
@@ -531,7 +565,9 @@ export de assets).
 
 ## O que já foi implementado
 
-- Scaffold completo (Next.js + TS + Tailwind v4 + Prisma 7/SQLite + pnpm).
+- Scaffold completo (Next.js + TS + Tailwind v4 + Prisma 7/PostgreSQL + pnpm).
+- Migração de SQLite local para Postgres hospedado (Prisma Postgres) — ver "Migração SQLite →
+  Postgres".
 - Schema de dados completo (5 models + enum), migrations aplicadas.
 - Camada de lógica de negócio compartilhada (`lib/business-logic`) com todas as regras de
   validação da seção acima.

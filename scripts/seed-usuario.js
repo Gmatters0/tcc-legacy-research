@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 "use strict";
 
-// Cria um Usuario de teste local para validar o fluxo de login (Sprint 0).
-// Ferramenta de apoio ao desenvolvimento — NÃO é a criação real de
-// participantes: isso é escopo do painel administrativo (Sprint 3), que vai
-// gerar código no padrão P[Iniciais]-Sequencial e senha aleatória via UI.
+// Cria um Usuario de teste local para validar o fluxo de login. Ferramenta de
+// apoio ao desenvolvimento — NÃO é a criação real de participantes: isso é
+// escopo do painel administrativo, que gera código no padrão
+// P[Iniciais]-Sequencial e senha aleatória via UI.
 // Uso: `pnpm run seed:usuario -- <codigo> <senha>`
 // Ex:  `pnpm run seed:usuario -- PJS-01 minhasenha123`
 
 require("dotenv/config");
-const path = require("node:path");
 const crypto = require("node:crypto");
-const Database = require("better-sqlite3");
+const { Client } = require("pg");
 
 // Precisa produzir o mesmo formato "salt:hash" que lib/auth/password.ts
 // (hashSenha), já que é essa função que o login (app/api/auth/login) usa
@@ -24,15 +23,7 @@ function hashSenha(senha) {
   return `${salt}:${hash}`;
 }
 
-function resolverCaminhoBanco() {
-  const url = process.env.DATABASE_URL;
-  if (!url || !url.startsWith("file:")) {
-    throw new Error(`DATABASE_URL inválida ou ausente (esperado "file:./dev.db", recebido "${url}"). Verifique o .env.`);
-  }
-  return path.resolve(process.cwd(), url.replace(/^file:/, ""));
-}
-
-function main() {
+async function main() {
   // `pnpm run seed:usuario -- <codigo> <senha>` repassa o "--" literal como
   // argumento (mesma pegadinha já tratada em reset-db.js) — filtra antes de
   // ler os argumentos posicionais.
@@ -43,22 +34,32 @@ function main() {
     return;
   }
 
-  const db = new Database(resolverCaminhoBanco());
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL ausente. Verifique o .env.");
+  }
 
-  const existente = db.prepare(`SELECT id FROM "Usuario" WHERE codigo = ?`).get(codigo);
-  if (existente) {
-    console.log(`Usuário "${codigo}" já existe (id: ${existente.id}). Nada a fazer.`);
-    db.close();
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+
+  const existente = await client.query('SELECT id FROM "Usuario" WHERE codigo = $1', [codigo]);
+  if (existente.rows.length) {
+    console.log(`Usuário "${codigo}" já existe (id: ${existente.rows[0].id}). Nada a fazer.`);
+    await client.end();
     return;
   }
 
   const id = crypto.randomUUID();
-  db.prepare(
-    `INSERT INTO "Usuario" (id, codigo, senhaHash, ativo, createdAt) VALUES (?, ?, ?, 1, ?)`,
-  ).run(id, codigo, hashSenha(senha), new Date().toISOString());
+  await client.query('INSERT INTO "Usuario" (id, codigo, "senhaHash", ativo) VALUES ($1, $2, $3, true)', [
+    id,
+    codigo,
+    hashSenha(senha),
+  ]);
 
   console.log(`Usuário de teste criado: código "${codigo}", senha "${senha}" (id: ${id}).`);
-  db.close();
+  await client.end();
 }
 
-main();
+main().catch((erro) => {
+  console.error("Falha ao criar usuário de teste:", erro);
+  process.exitCode = 1;
+});

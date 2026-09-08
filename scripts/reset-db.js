@@ -1,31 +1,24 @@
 #!/usr/bin/env node
 "use strict";
 
-// Zera a base de dados local (SQLite) para começar uma rodada de testes do
-// zero. Uso: `pnpm run db:reset` (pede confirmação interativa) ou
-// `pnpm run db:reset -- --yes` (pula a confirmação, útil em automação).
+// Zera a base de dados (Postgres, via Prisma Postgres) para começar uma
+// rodada de testes do zero. Uso: `pnpm run db:reset` (pede confirmação
+// interativa) ou `pnpm run db:reset -- --yes` (pula a confirmação, útil em
+// automação).
 
 require("dotenv/config");
-const path = require("node:path");
 const readline = require("node:readline");
-const Database = require("better-sqlite3");
+const { Client } = require("pg");
 
 // Ordem respeita as dependências de chave estrangeira (filhos antes dos pais)
 // mesmo onde não há ON DELETE CASCADE configurado.
 const TABELAS_EM_ORDEM_DE_EXCLUSAO = ["EventoErro", "ItemRecebido", "LancamentoEstoque", "NotaFiscal", "SessaoTeste"];
 
-function resolverCaminhoBanco() {
-  const url = process.env.DATABASE_URL;
-  if (!url || !url.startsWith("file:")) {
-    throw new Error(`DATABASE_URL inválida ou ausente (esperado "file:./dev.db", recebido "${url}"). Verifique o .env.`);
-  }
-  return path.resolve(process.cwd(), url.replace(/^file:/, ""));
-}
-
-function contarRegistros(db) {
+async function contarRegistros(client) {
   const contagens = {};
   for (const tabela of TABELAS_EM_ORDEM_DE_EXCLUSAO) {
-    contagens[tabela] = db.prepare(`SELECT COUNT(*) as total FROM "${tabela}"`).get().total;
+    const { rows } = await client.query(`SELECT COUNT(*)::int AS total FROM "${tabela}"`);
+    contagens[tabela] = rows[0].total;
   }
   return contagens;
 }
@@ -48,21 +41,23 @@ function perguntar(pergunta) {
 
 async function main() {
   const confirmadoPorFlag = process.argv.slice(2).some((arg) => arg === "--yes" || arg === "-y");
-  const caminhoBanco = resolverCaminhoBanco();
 
-  const db = new Database(caminhoBanco);
-  db.pragma("foreign_keys = ON");
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL ausente. Verifique o .env.");
+  }
 
-  const contagensAntes = contarRegistros(db);
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+
+  const contagensAntes = await contarRegistros(client);
   const totalAntes = Object.values(contagensAntes).reduce((soma, n) => soma + n, 0);
 
-  console.log(`Banco de dados: ${caminhoBanco}`);
   console.log("Registros atuais:");
   imprimirContagens(contagensAntes);
 
   if (totalAntes === 0) {
     console.log("\nO banco já está vazio. Nada a fazer.");
-    db.close();
+    await client.end();
     return;
   }
 
@@ -72,22 +67,26 @@ async function main() {
     );
     if (resposta.trim() !== "CONFIRMAR") {
       console.log("Operação cancelada — nenhum dado foi apagado.");
-      db.close();
+      await client.end();
       return;
     }
   }
 
-  const apagarTudo = db.transaction(() => {
+  try {
+    await client.query("BEGIN");
     for (const tabela of TABELAS_EM_ORDEM_DE_EXCLUSAO) {
-      db.prepare(`DELETE FROM "${tabela}"`).run();
+      await client.query(`DELETE FROM "${tabela}"`);
     }
-  });
-  apagarTudo();
+    await client.query("COMMIT");
+  } catch (erro) {
+    await client.query("ROLLBACK");
+    throw erro;
+  }
 
   console.log("\nBanco de dados zerado. Registros restantes:");
-  imprimirContagens(contarRegistros(db));
+  imprimirContagens(await contarRegistros(client));
 
-  db.close();
+  await client.end();
 }
 
 main().catch((erro) => {

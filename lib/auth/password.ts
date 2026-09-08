@@ -1,8 +1,8 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
-// node:crypto em vez de uma dependência de hashing — evita adicionar módulo
-// nativo novo (o projeto já lida com aprovação de build scripts do pnpm para
-// better-sqlite3/Prisma; scrypt do Node cobre a necessidade sem mais um).
+// node:crypto em vez de uma dependência de hashing — evita adicionar mais um
+// módulo nativo (o projeto já lida com aprovação de build scripts do pnpm
+// pro Prisma; scrypt do Node cobre a necessidade sem mais um).
 const KEYLEN = 64;
 
 export function hashSenha(senha: string): string {

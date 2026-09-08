@@ -92,7 +92,7 @@ só chamam os mesmos endpoints HTTP em `app/api/**`, que por sua vez só importa
 
 ```
 Cenário A (UI)  ─┐
-                  ├──► /app/api/** ──► lib/business-logic/** ──► Prisma ──► SQLite
+                  ├──► /app/api/** ──► lib/business-logic/** ──► Prisma ──► PostgreSQL
 Cenário B (UI)  ─┘
 ```
 
@@ -110,9 +110,10 @@ medido — não violam a regra, porque a lógica e os dados por trás continuam 
 
 - **[Next.js 16](https://nextjs.org)** (App Router, Turbopack) + **TypeScript** — front-end e
   back-end no mesmo processo, via Route Handlers (`app/api/**`).
-- **[Prisma 7](https://www.prisma.io)** + **SQLite**, via driver adapter
-  `@prisma/adapter-better-sqlite3` (Prisma 7 exige um adapter explícito, não aceita mais
-  conexão direta por `DATABASE_URL`).
+- **[Prisma 7](https://www.prisma.io)** + **PostgreSQL** ([Prisma Postgres](https://www.prisma.io/postgres),
+  hospedado), via driver adapter `@prisma/adapter-pg` + `pg` (Prisma 7 exige um adapter
+  explícito, não aceita mais conexão direta por `DATABASE_URL`). Rodou em SQLite local
+  (`@prisma/adapter-better-sqlite3`) até a migração para hospedagem pública.
 - **[Tailwind CSS v4](https://tailwindcss.com)** para estilo, sem arquivo central de design
   tokens; cores e espaçamentos foram extraídos diretamente do Figma e aplicados como classes
   arbitrárias componente a componente (ex.: `text-[#004ac6]`).
@@ -122,9 +123,9 @@ medido — não violam a regra, porque a lógica e os dados por trás continuam 
 - **pnpm** como gerenciador de pacotes — **obrigatório**, não usar `npm`/`yarn`. A versão está
   fixada em `package.json` (`packageManager: "pnpm@10.33.0"`).
 
-Não há backend separado: o mesmo processo Next.js serve as páginas, as API Routes e o acesso
-ao banco. Não há serviços externos, filas, cache distribuído ou qualquer infraestrutura além
-de um único arquivo SQLite local.
+Não há backend separado: o mesmo processo Next.js serve as páginas e as API Routes; só o banco
+de dados (Postgres) é externo, hospedado. Não há filas, cache distribuído ou qualquer outra
+infraestrutura além disso.
 
 ## Arquitetura
 
@@ -490,10 +491,11 @@ pnpm test
 # 1. Instalar dependências (roda os build scripts aprovados automaticamente)
 pnpm install
 
-# 2. Copiar/ajustar o .env — confira DATABASE_URL e defina uma ADMIN_SENHA real
-#    (o arquivo .env já vem com placeholders no repositório de desenvolvimento)
+# 2. Configurar o .env — DATABASE_URL precisa ser a connection string de um banco
+#    Postgres (ex: Prisma Postgres) e ADMIN_SENHA uma senha real seguindo o
+#    placeholder do exemplo
 
-# 3. Aplicar as migrations no banco local
+# 3. Aplicar as migrations no banco
 pnpm exec prisma migrate dev
 
 # 4. Subir o servidor de desenvolvimento
@@ -587,7 +589,8 @@ vitest.config.mts            configuração dos testes automatizados
   (`scrypt`), nunca em texto puro — a única vez que uma senha de participante aparece em texto
   puro é na tela de criação de usuário no painel admin, exibida uma única vez para o
   pesquisador copiar/repassar.
-- O banco de dados (`dev.db`) é local e nunca versionado no Git (`.gitignore`).
+- A connection string do banco de dados fica só em `DATABASE_URL` (`.env`, ou variável de
+  ambiente do host de deploy), nunca versionada no Git (`.gitignore`).
 
 ## Referências de design (Figma)
 
