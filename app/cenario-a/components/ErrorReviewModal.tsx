@@ -11,6 +11,10 @@ interface Props {
 
 export function ErrorReviewModal({ erros, onFechar }: Props) {
   const [etapa, setEtapa] = useState<"confirmar" | "detalhe">("confirmar");
+  // Vários itens vazios geram a mesma mensagem repetida (uma por item) — a
+  // instrumentação já registrou cada ocorrência real, aqui só evita mostrar a
+  // mesma frase várias vezes na lista.
+  const errosUnicos = Array.from(new Map(erros.map((erro) => [erro.mensagem, erro])).values());
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -52,7 +56,7 @@ export function ErrorReviewModal({ erros, onFechar }: Props) {
         ) : (
           <div className="flex flex-col gap-3 p-6">
             <ul className="flex flex-col gap-2 text-xs text-[#1b1c1c]">
-              {erros.map((erro, index) => (
+              {errosUnicos.map((erro, index) => (
                 <li key={index} className="border border-[#c2c7d0] bg-[#f9f9f9] p-2">
                   <span className="font-bold">{erro.campo}:</span> {erro.mensagem}
                 </li>

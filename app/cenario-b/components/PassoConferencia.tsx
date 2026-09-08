@@ -99,7 +99,10 @@ export function PassoConferencia({ notaFiscalId, itens, onChangeItens, onVoltar,
         listaErros.forEach((erro) =>
           registrarErro(classificarTipoErroPorMensagem(erro.mensagem), `cenario-b/conferencia.${erro.campo}`),
         );
-        setErros(listaErros.map((erro) => erro.mensagem));
+        // Cada item vazio gera um erro igual ("Código do item é obrigatório." etc.)
+        // — a instrumentação registra todos (métrica real de erro), mas a lista
+        // exibida mostra só mensagens únicas, senão repete uma vez por item.
+        setErros([...new Set(listaErros.map((erro) => erro.mensagem))]);
         return;
       }
       const quantidadeTotal = itens.reduce((soma, item) => soma + (Number(item.qtdRecebidaTexto) || 0), 0);

@@ -68,7 +68,9 @@ export function PassoBaixa({ notaFiscal, quantidadeSugerida, form, onChangeForm,
           registrarErro(classificarTipoErroPorMensagem(erro.mensagem), `cenario-b/baixa.${erro.campo}`),
         );
         setErros(
-          listaErros.length ? listaErros.map((erro) => erro.mensagem) : ["Não foi possível registrar a baixa."],
+          listaErros.length
+            ? [...new Set(listaErros.map((erro) => erro.mensagem))]
+            : ["Não foi possível registrar a baixa."],
         );
         return;
       }
