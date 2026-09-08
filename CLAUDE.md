@@ -63,7 +63,8 @@ Todos via `pnpm` (nunca `npm`):
 | `pnpm exec prisma studio` | Abre GUI local para inspecionar o banco |
 | `pnpm run db:reset` | **Zera o banco de dados** (pede confirmação `CONFIRMAR`) |
 | `pnpm run db:reset -- --yes` | Zera o banco sem prompt (automação) |
-| `pnpm test` | Roda a suíte de testes automatizados (Vitest, ver seção "Testes Automatizados") |
+| `pnpm test` | Roda a suíte de testes unitários (Vitest, ver seção "Testes Automatizados") |
+| `pnpm run test:e2e` | Roda a suíte de smoke tests E2E (Playwright, ver seção "Testes Automatizados") |
 
 **Antes de qualquer coleta de dados real com participantes, rode `pnpm run db:reset`** para
 garantir que a base começa vazia — o script apaga `EventoErro`, `ItemRecebido`,
@@ -216,6 +217,29 @@ proxy.ts                            → (raiz do projeto) bloqueia acesso direto
 vitest.config.mts                   → config do Vitest (alias "@", ver "Testes Automatizados")
 *.test.ts                           → co-localizados com o arquivo testado, não numa pasta
                                        __tests__ separada (ver "Testes Automatizados")
+playwright.config.ts                → config do Playwright (raiz do projeto, ver "Testes
+                                       Automatizados")
+/e2e                                 → smoke tests E2E (Playwright, ver "Testes Automatizados")
+  auth.spec.ts                      → login/logout, proteção de rota (proxy.ts), 401 de API
+                                       sem sessão
+  cenario-a.spec.ts                 → fluxo de sucesso (com divergência) + os 4 tipos de
+                                       EventoErro no Cenário A
+  cenario-b.spec.ts                 → fluxo de sucesso (sem divergência), persistência ao
+                                       voltar no Stepper, + os 4 tipos de EventoErro no B
+  nao-repeticao-e-encerramento.spec.ts → regra de não-repetição (trava de UI + rejeição no
+                                       servidor) e telas de encerramento (/sucesso, /obrigado,
+                                       desativação de Usuario)
+  admin.spec.ts                     → login do painel, criação/ativação/desativação de
+                                       Usuario, formato do código gerado
+  /helpers
+    db.ts                           → cria Usuario de teste via pg cru (mesmo formato de hash
+                                       de lib/auth/password.ts), consultas de asserção
+    auth.ts                         → login()/iniciarTarefa() reutilizados por todos os specs
+    fluxo.ts                        → completarCenarioA()/completarCenarioB() — preenche e
+                                       submete um fluxo completo, usado pelos specs que só
+                                       precisam chegar em /sucesso sem testar o fluxo em si
+    global-teardown.ts              → apaga todo dado criado pelos testes (prefixos
+                                       reconhecíveis, nunca dado real) ao final da suíte
 ```
 
 ## Modelo de Dados (`prisma/schema.prisma`)
@@ -519,10 +543,14 @@ Rota `/admin`, login próprio e separado do login de participante (`lib/admin/`)
 
 ## Testes Automatizados
 
-**Vitest** (`vitest.config.mts`), sem Jest/Playwright ainda — decisão registrada após pesquisa
-comparativa (ESM nativo combina melhor com Turbopack; Playwright fica para os smoke tests
-ponta a ponta, deliberadamente adiados para **rodar só antes do primeiro teste piloto com
-participante real**, não fazem parte desta rodada).
+Duas camadas, com escopos deliberadamente diferentes: **Vitest** para unidade (lógica pura,
+mock de Prisma pontual) e **Playwright** para smoke test E2E (fluxo real, navegador real, banco
+Postgres real).
+
+### Unitários (Vitest)
+
+**Vitest** (`vitest.config.mts`) — decisão registrada após pesquisa comparativa (ESM nativo
+combina melhor com Turbopack).
 
 - **Arquivos `*.test.ts` co-localizados** com o código que testam (ex:
   `lib/business-logic/conferencia.test.ts` ao lado de `conferencia.ts`) — sem pasta
@@ -537,10 +565,40 @@ participante real**, não fazem parte desta rodada).
   uma consulta — `criarUsuario` (o algoritmo de sequencial por grupo de iniciais, apontado como
   ponto de risco na pesquisa da Sprint de testes), `autenticarUsuario` e
   `buscarHistoricoParticipacao`. Nenhum teste grava no banco Postgres real.
-- **Deliberadamente fora desta rodada**: os caminhos de sucesso (`create`/`update` reais) de
-  `criarNotaFiscal`, `registrarConferenciaItens` e `registrarBaixaEstoque`, e qualquer teste de
-  UI/E2E — ficam cobertos depois pelos smoke tests do Playwright (login → tarefa completa →
-  `/sucesso`, em cada cenário), a rodar antes do piloto.
+- **Deliberadamente fora desta camada**: caminhos de sucesso (`create`/`update` reais) e
+  qualquer teste de UI — cobertos pelos smoke tests E2E abaixo.
+
+### Smoke tests E2E (Playwright)
+
+`playwright.config.ts` (raiz) + `/e2e` — rodam contra um servidor Next.js **real** (`pnpm run
+dev`, subido automaticamente pelo `webServer` do Playwright) conectado ao **Postgres real**
+(mesmo `DATABASE_URL` do `.env`), não um banco de teste separado.
+
+- **`workers: 1` / `fullyParallel: false` de propósito**: `POST /api/sessoes` apaga **qualquer**
+  `SessaoTeste` com `timestampFim` nulo no banco inteiro, como rede de segurança contra sessão
+  abandonada (ver "Time-on-Task") — a aplicação assume um único participante/sessão por vez
+  (não é multi-tenant). Rodar specs em paralelo faz um teste apagar a sessão em andamento de
+  outro (`EventoErro` viola FK) — sequencial evita isso e também reflete o uso real.
+- **Dado de teste identificável e limpo automaticamente** (`e2e/helpers/db.ts` +
+  `global-teardown.ts`): `Usuario` de teste usa código `E2E-<rótulo>-<sufixo>` (via
+  `criarUsuarioTeste`) ou iniciais `ZZ<letras>` no painel admin (`PREFIXO_INICIAIS_ADMIN_TESTE`
+  — "ZZ" não é uma dupla de iniciais real plausível); `NotaFiscal` de teste sempre começa com
+  `99` (`gerarNumeroNfTeste`). O `globalTeardown` apaga tudo que bate esses prefixos ao final da
+  suíte inteira (sucesso ou falha), nunca toca em `Usuario`/`NotaFiscal` reais.
+- **Cobertura**: login/logout e proteção de rota (`proxy.ts` + 401 de API sem sessão,
+  `auth.spec.ts`); fluxo de sucesso completo (com e sem divergência) em cada cenário
+  (`cenario-a.spec.ts`, `cenario-b.spec.ts`); persistência de navegação do Cenário B ao voltar
+  no Stepper; os **4 tipos de `EventoErro`** em cada cenário, verificando não só o disparo mas
+  a gravação real na tabela (`buscarEventosErro` + `expect.poll`); regra de não-repetição —
+  trava de UI e rejeição autoritativa no servidor mesmo contornando o client
+  (`nao-repeticao-e-encerramento.spec.ts`); telas de encerramento (`/sucesso`,
+  `/obrigado`, desativação de `Usuario` e bloqueio de novo login); painel administrativo —
+  login, criação de usuário (formato do código, ausência de caracteres ambíguos na senha),
+  toggle ativar/desativar (`admin.spec.ts`).
+- **`ADMIN_SENHA` lido de `process.env`** (via `dotenv/config` em `playwright.config.ts`) —
+  nunca hardcoded no arquivo de teste, é o mesmo segredo real do `.env`.
+- **Depois de rodar**, `pnpm run db:reset -- --yes` como rede de segurança extra antes de
+  qualquer coleta real (o teardown já limpa sozinho, mas não custa nada).
 
 ## Design de Referência (Figma)
 
@@ -607,6 +665,10 @@ export de assets).
   ambos os cenários após cada rodada de mudanças.
 - Testes automatizados unitários (Vitest) das camadas `business-logic`, `instrumentation` e
   `auth` — ver seção "Testes Automatizados".
+- Smoke tests E2E (Playwright): 30 testes cobrindo login/proteção de rota, fluxo de sucesso e
+  os 4 tipos de `EventoErro` em cada cenário, regra de não-repetição, telas de encerramento e
+  painel administrativo — todos passando contra o Postgres real. Ver seção "Testes
+  Automatizados".
 
 ## O que ainda falta implementar (fora de escopo até agora)
 
@@ -617,5 +679,3 @@ Itens explicitamente adiados desde o pedido original, ainda não implementados:
   conteúdo de cada conjunto (duas NFs de exemplo, com itens e divergências propositais) já foi
   definido pelo pesquisador, mas por decisão dele é entregue ao participante fora do app
   (impresso/verbal) — não precisa de UI própria, só documentação externa ao repositório.
-- **Smoke tests E2E (Playwright)**: adiados de propósito — rodar antes do primeiro teste piloto
-  com participante real, não antes. Ver "Testes Automatizados".

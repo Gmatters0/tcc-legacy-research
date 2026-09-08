@@ -118,8 +118,8 @@ medido — não violam a regra, porque a lógica e os dados por trás continuam 
   tokens; cores e espaçamentos foram extraídos diretamente do Figma e aplicados como classes
   arbitrárias componente a componente (ex.: `text-[#004ac6]`).
   **[lucide-react](https://lucide.dev)** para ícones.
-- **[Vitest](https://vitest.dev)** para testes unitários (ver
-  [Testes Automatizados](#testes-automatizados)).
+- **[Vitest](https://vitest.dev)** para testes unitários e **[Playwright](https://playwright.dev)**
+  para smoke tests E2E (ver [Testes Automatizados](#testes-automatizados)).
 - **pnpm** como gerenciador de pacotes — **obrigatório**, não usar `npm`/`yarn`. A versão está
   fixada em `package.json` (`packageManager: "pnpm@10.33.0"`).
 
@@ -456,14 +456,20 @@ formas diferentes:
 
 ## Testes automatizados
 
-O projeto usa **[Vitest](https://vitest.dev)** para testes unitários. A escolha em vez de Jest
-veio de uma pesquisa comparativa registrada no processo do TCC: suporte nativo a ESM combina
-melhor com o Turbopack do Next.js 16, com configuração mais simples.
+O projeto usa duas camadas de teste automatizado, com escopos deliberadamente diferentes:
+**[Vitest](https://vitest.dev)** para lógica de negócio isolada e **[Playwright](https://playwright.dev)**
+para smoke tests ponta a ponta contra um servidor e um banco reais.
+
+### Testes unitários (Vitest)
+
+A escolha em vez de Jest veio de uma pesquisa comparativa registrada no processo do TCC:
+suporte nativo a ESM combina melhor com o Turbopack do Next.js 16, com configuração mais
+simples.
 
 - Arquivos `*.test.ts` ficam **co-localizados** com o código que testam (ex.:
   `lib/business-logic/conferencia.test.ts` ao lado de `conferencia.ts`), sem uma pasta
   `__tests__` separada.
-- **O que está coberto hoje**: as funções puras do domínio (cálculo de divergência, validação
+- **O que está coberto**: as funções puras do domínio (cálculo de divergência, validação
   de elegibilidade, classificação de tipo de erro, as duas heurísticas de
   `ERRO_LOGICO_CADASTRO`, hash/verificação/geração de senha) e os caminhos de **rejeição de
   validação** das funções de negócio (`criarNotaFiscal`, `registrarConferenciaItens`,
@@ -472,18 +478,40 @@ melhor com o Turbopack do Next.js 16, com configuração mais simples.
   consulta ao banco (o algoritmo de geração de código sequencial em `criarUsuario`, o login em
   `autenticarUsuario`, a consulta de histórico em `buscarHistoricoParticipacao`), o Prisma é
   mockado — **nenhum teste grava no banco de desenvolvimento real**.
-- **Deliberadamente fora desta rodada**: os caminhos de sucesso (escrita real no banco) das
-  três funções de negócio citadas, e qualquer teste de UI ou ponta a ponta. Esse último tipo
-  fica reservado para uma suíte de smoke tests com **Playwright** (login → tarefa completa →
-  tela de sucesso, em cada cenário) — deliberadamente adiada para rodar **só imediatamente
-  antes do primeiro teste piloto com um participante real**, como uma última checagem de que o
-  pipeline inteiro não está quebrado.
-
-Para rodar a suíte:
+- **Deliberadamente fora desta camada**: os caminhos de sucesso (escrita real no banco) das
+  três funções de negócio citadas, e qualquer teste de UI — cobertos pelos smoke tests E2E.
 
 ```bash
 pnpm test
 ```
+
+### Smoke tests E2E (Playwright)
+
+Rodam contra um servidor Next.js real (`pnpm run dev`, subido automaticamente pelo próprio
+Playwright) conectado ao **Postgres real** — não um banco de teste separado. Cada teste cria
+seu próprio `Usuario`/`NotaFiscal` com prefixos reconhecíveis (`E2E-...`, número de NF
+começando em `99`, iniciais de admin `ZZ...`), e um `globalTeardown` apaga tudo isso ao final
+da suíte inteira, com sucesso ou falha — nunca toca em dado real.
+
+- **Roda sequencialmente (`workers: 1`)**, de propósito: `POST /api/sessoes` limpa qualquer
+  sessão de teste abandonada no banco inteiro como rede de segurança (a aplicação assume um
+  único participante por vez, não é multi-tenant) — em paralelo, um teste apagaria a sessão em
+  andamento de outro.
+- **Cobertura**: login/logout e proteção de rota; fluxo de sucesso completo (com e sem
+  divergência) em cada cenário; persistência de navegação do Cenário B; os **4 tipos de
+  `EventoErro`** em cada cenário, verificando o disparo **e** a gravação real na tabela; regra
+  de não-repetição (trava de UI e rejeição no servidor mesmo contornando o client); telas de
+  encerramento (`/sucesso`, `/obrigado`, desativação de usuário); painel administrativo
+  (login, criação/ativação/desativação de usuário).
+- `ADMIN_SENHA` é lido do `.env` real em tempo de execução — nunca hardcoded no arquivo de
+  teste.
+
+```bash
+pnpm run test:e2e
+```
+
+**Depois de rodar**, `pnpm run db:reset -- --yes` é uma rede de segurança extra antes de
+qualquer coleta real (o teardown já limpa sozinho).
 
 ## Como rodar o projeto
 
@@ -513,7 +541,8 @@ administrativo fica em `/admin`, com login separado via `ADMIN_SENHA`.
 | `pnpm run lint` | ESLint |
 | `pnpm exec tsc --noEmit` | Checagem de tipos sem gerar arquivos |
 | `pnpm exec prisma studio` | GUI local para inspecionar o banco |
-| `pnpm test` | Suíte de testes automatizados (Vitest) |
+| `pnpm test` | Suíte de testes unitários (Vitest) |
+| `pnpm run test:e2e` | Suíte de smoke tests E2E (Playwright) |
 | `pnpm run db:reset` | **Zera o banco de dados** (apaga sessões, notas e eventos — preserva os `Usuario` cadastrados). Pede confirmação; use `-- --yes` para pular o prompt |
 | `pnpm run seed:usuario -- <codigo> <senha>` | Cria um `Usuario` de teste local, sem passar pela geração automática do painel admin — só para desenvolvimento |
 
@@ -550,7 +579,9 @@ garantir que a base começa vazia, e confirme que `ADMIN_SENHA` foi trocada do p
 /scripts
   reset-db.js, seed-usuario.js
 proxy.ts                     proteção de rota para /cenario-a, /cenario-b, /sucesso
-vitest.config.mts            configuração dos testes automatizados
+vitest.config.mts            configuração dos testes unitários
+playwright.config.ts          configuração dos smoke tests E2E
+/e2e                          smoke tests E2E (specs + helpers, ver Testes Automatizados)
 ```
 
 ## Exceções, comportamentos especiais e limitações conhecidas
@@ -574,9 +605,10 @@ vitest.config.mts            configuração dos testes automatizados
 - **A desativação de um `Usuario` é definitiva até reativação manual**: — depois de "Finalizar
   participação", aquele código de acesso para de funcionar; só o painel admin pode reverter
   isso.
-- **Smoke tests end-to-end (Playwright) ainda não existem** - ver
-  [Testes Automatizados](#testes-automatizados). É a única lacuna de verificação automatizada
-  conhecida no momento, e está deliberadamente agendada para antes do piloto, não antes.
+- **Os smoke tests E2E rodam sequencialmente, nunca em paralelo** — reflexo direto da
+  rede de segurança de `POST /api/sessoes` (limpa qualquer sessão de teste pendente no banco
+  inteiro), que por sua vez reflete o uso real do sistema: um único participante por vez. Ver
+  [Testes Automatizados](#testes-automatizados).
 
 ## Privacidade e ética de pesquisa
 
@@ -614,10 +646,8 @@ diretamente com o frame correspondente no Figma. Ícones foram substituídos por
 
 O que ainda falta antes da coleta de dados com participantes reais:
 
-1. **Smoke tests Playwright** — fluxo completo (login → tarefa → sucesso) em cada cenário,
-   como última checagem de regressão antes do piloto.
-2. **Teste piloto** com 1–2 participantes reais, para validar tempo de tarefa, clareza da
+1. **Teste piloto** com 1–2 participantes reais, para validar tempo de tarefa, clareza da
    instrução externa dos conjuntos de tarefa, e ajustar qualquer atrito encontrado antes da
    coleta em escala.
-3. **Coleta de dados** propriamente dita, seguida de exportação via painel admin e análise
+2. **Coleta de dados** propriamente dita, seguida de exportação via painel admin e análise
    estatística comparando Time-on-Task e Taxa de Erros por tipo entre os dois cenários.
