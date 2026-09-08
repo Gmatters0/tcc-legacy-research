@@ -14,7 +14,7 @@ export function DepositoModal({ onSelecionar, onFechar }: Props) {
       <div className="w-full max-w-sm border border-[#727780] bg-white shadow-lg">
         <div className="flex items-center justify-between border-b border-[#c2c7d0] bg-[#efeded] px-4 py-2">
           <span className="text-sm font-bold text-[#1b1c1c]">Selecionar Depósito</span>
-          <button type="button" onClick={onFechar} aria-label="Fechar">
+          <button type="button" onClick={onFechar} aria-label="Fechar" className="rounded p-0.5 hover:bg-[#d2d2d2]">
             <X className="h-4 w-4 text-[#42474f]" />
           </button>
         </div>

@@ -19,7 +19,7 @@ export function FooterFKeys({ onSalvar }: { onSalvar: () => void }) {
   return (
     <footer className="flex h-5 items-center justify-between border-t border-[#727780] bg-[#dbdad9] px-2 text-[10px] text-[#1b1c1c]">
       <div className="flex items-center gap-4">
-        <button type="button" onClick={onSalvar} className="flex items-center gap-1">
+        <button type="button" onClick={onSalvar} className="flex items-center gap-1 hover:bg-[#c2c7d0]">
           <span className="font-bold">[F2]</span>
           Salvar
         </button>
@@ -28,7 +28,7 @@ export function FooterFKeys({ onSalvar }: { onSalvar: () => void }) {
             key={tecla}
             type="button"
             onClick={() => handleElementoDecorativo(`footer.${id}`)}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 hover:bg-[#c2c7d0]"
           >
             <span className="font-bold">{tecla}</span>
             {label}
@@ -37,7 +37,7 @@ export function FooterFKeys({ onSalvar }: { onSalvar: () => void }) {
         <button
           type="button"
           onClick={() => handleElementoDecorativo("footer.F12-Sair")}
-          className="flex items-center gap-1 text-[#b91c1c]"
+          className="flex items-center gap-1 text-[#b91c1c] hover:bg-[#c2c7d0]"
         >
           <span className="font-bold">[F12]</span>
           Sair

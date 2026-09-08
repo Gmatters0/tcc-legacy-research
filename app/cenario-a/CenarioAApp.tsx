@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SessaoProvider, useSessao } from "@/lib/instrumentation/SessaoProvider";
 import { classificarTipoErroPorMensagem } from "@/lib/instrumentation/erros";
 import { TipoEventoErro } from "@/lib/instrumentation/types";
@@ -16,7 +16,7 @@ import { DepositoModal } from "./components/DepositoModal";
 import type { ErroApi, ItemConferenciaA } from "./types";
 
 function paraIso(dataPontuada: string): string {
-  const partes = dataPontuada.split(".");
+  const partes = dataPontuada.split(".").map((parte) => parte.trim());
   if (partes.length !== 3) return dataPontuada;
   const [dia, mes, ano] = partes;
   return `${ano}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`;
@@ -56,6 +56,8 @@ function CenarioAConteudo() {
 
   const [erros, setErros] = useState<ErroApi[] | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // Guarda síncrono contra duplo clique/duplo F2 — não depende do re-render.
+  const salvandoRef = useRef(false);
 
   const quantidadeLancar = itens.reduce((soma, item) => soma + (Number(item.qtdRecebidaTexto) || 0), 0);
 
@@ -105,6 +107,8 @@ function CenarioAConteudo() {
   }
 
   async function handleSalvar() {
+    if (salvandoRef.current) return;
+    salvandoRef.current = true;
     setSalvando(true);
     setErros(null);
     const errosColetados: ErroApi[] = [];
@@ -166,6 +170,7 @@ function CenarioAConteudo() {
     } catch {
       errosColetados.push({ campo: "geral", mensagem: "Falha de comunicação com o servidor." });
     } finally {
+      salvandoRef.current = false;
       setSalvando(false);
       if (errosColetados.length) {
         errosColetados.forEach((erro) => registrarErro(classificarTipoErroPorMensagem(erro.mensagem), erro.campo));
@@ -173,6 +178,18 @@ function CenarioAConteudo() {
       }
     }
   }
+
+  // F2 já aparece descrito no rodapé ([F2] Salvar) — ativa o atalho de
+  // verdade, fidelidade ao padrão de teclas de função do legado (SAP/Protheus).
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "F2") return;
+      event.preventDefault();
+      handleSalvar();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
 
   return (
     <div className="flex min-h-screen flex-col bg-[#dbdad9] text-[#1b1c1c]">

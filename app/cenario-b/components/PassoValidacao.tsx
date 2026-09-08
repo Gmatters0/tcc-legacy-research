@@ -8,6 +8,21 @@ import { fornecedorPareceNumeroNota } from "@/lib/instrumentation/heuristica";
 import { TipoEventoErro } from "@/lib/instrumentation/types";
 import type { FormValidacao, NotaFiscalResumo } from "../types";
 
+// Digita só dígitos, formata como centavos (padrão de máscara monetária BR) —
+// evita separador errado ou texto não numérico chegar no submit.
+function aplicarMascaraMoeda(valorDigitado: string): string {
+  const digitos = valorDigitado.replace(/\D/g, "");
+  if (!digitos) return "";
+  const numero = Number(digitos) / 100;
+  return numero.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Desfaz a máscara (remove separador de milhar, troca vírgula decimal por
+// ponto) antes de converter pra number.
+function paraNumero(valorMascarado: string): number {
+  return Number(valorMascarado.replace(/\./g, "").replace(",", "."));
+}
+
 interface Props {
   form: FormValidacao;
   onChangeForm: (form: FormValidacao) => void;
@@ -39,7 +54,7 @@ export function PassoValidacao({ form, onChangeForm, notaFiscalExistente, onConc
       return "Número da NF deve conter apenas números.";
     }
     if (campo === "valorTotal") {
-      const numero = Number(valor.replace(",", "."));
+      const numero = paraNumero(valor);
       if (Number.isNaN(numero)) {
         registrarErro(TipoEventoErro.ERRO_VALIDACAO_CAMPO, `cenario-b/validacao.${campo}`);
         return "Informe um valor numérico válido.";
@@ -87,7 +102,7 @@ export function PassoValidacao({ form, onChangeForm, notaFiscalExistente, onConc
           numero: form.numero,
           fornecedor: form.fornecedor,
           dataEmissao: form.dataEmissao,
-          valorTotal: Number(form.valorTotal.replace(",", ".")),
+          valorTotal: paraNumero(form.valorTotal),
         }),
       });
       const data = await response.json();
@@ -175,14 +190,15 @@ export function PassoValidacao({ form, onChangeForm, notaFiscalExistente, onConc
           <label className="text-sm font-medium text-[#191b23]">Valor Total (R$)</label>
           <input
             type="text"
+            inputMode="numeric"
             value={form.valorTotal}
-            onChange={(e) => alterarCampo("valorTotal", e.target.value)}
+            onChange={(e) => alterarCampo("valorTotal", aplicarMascaraMoeda(e.target.value))}
             onBlur={() => handleBlur("valorTotal")}
             readOnly={somenteLeitura}
             className={`rounded-lg border px-4 py-2 text-sm text-[#191b23] focus:outline-none ${
               somenteLeitura ? "bg-[#f3f4f6]" : ""
             } ${erros.valorTotal ? "border-red-500" : "border-[#c3c6d7]"}`}
-            placeholder="Ex: 12450,00"
+            placeholder="Ex: 12.450,00"
           />
           {erros.valorTotal && <p className="text-xs text-red-600">{erros.valorTotal}</p>}
         </div>

@@ -117,7 +117,7 @@ export function PassoConferencia({ notaFiscalId, itens, onChangeItens, onVoltar,
           <button
             type="button"
             onClick={adicionarItem}
-            className="flex items-center gap-1.5 rounded-lg border border-[#004ac6] px-3 py-1.5 text-xs font-semibold text-[#004ac6]"
+            className="flex items-center gap-1.5 rounded-lg bg-[#004ac6] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#003a9b]"
           >
             <Plus className="h-3.5 w-3.5" />
             Adicionar Item

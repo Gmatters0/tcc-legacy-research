@@ -2,6 +2,16 @@
 
 type Campo = "numero" | "fornecedor" | "dataEmissao" | "valorTotal";
 
+// Só deixa dígito passar e insere os pontos sozinho (DD.MM.AAAA) — evita o
+// participante digitar separador errado, ano com 2 dígitos ou espaço sobrando,
+// que fazia a validação de data recusar valor que parecia certo.
+function aplicarMascaraData(valorDigitado: string): string {
+  const digitos = valorDigitado.replace(/\D/g, "").slice(0, 8);
+  if (digitos.length > 4) return `${digitos.slice(0, 2)}.${digitos.slice(2, 4)}.${digitos.slice(4)}`;
+  if (digitos.length > 2) return `${digitos.slice(0, 2)}.${digitos.slice(2)}`;
+  return digitos;
+}
+
 interface Props {
   numero: string;
   fornecedor: string;
@@ -43,9 +53,11 @@ export function FieldsetValidacao({
           Data Emissão:
           <input
             type="text"
+            inputMode="numeric"
             value={dataEmissao}
-            onChange={(e) => onChange("dataEmissao", e.target.value)}
+            onChange={(e) => onChange("dataEmissao", aplicarMascaraData(e.target.value))}
             placeholder="DD.MM.AAAA"
+            maxLength={10}
             className="w-20 border border-[#6b7280] bg-white px-3 py-2 text-base text-[#1b1c1c] focus:outline-none"
           />
         </label>

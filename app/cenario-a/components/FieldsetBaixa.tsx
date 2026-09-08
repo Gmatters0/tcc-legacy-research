@@ -37,7 +37,7 @@ export function FieldsetBaixa({
             type="button"
             onClick={onAbrirModalDeposito}
             title="Buscar depósito"
-            className="flex h-5 items-center border border-white bg-[#d2d2d2] px-1"
+            className="flex h-5 items-center border border-white bg-[#d2d2d2] px-1 hover:bg-[#c2c7d0]"
           >
             <Search className="h-2.5 w-2.5 text-[#1b1c1c]" />
           </button>

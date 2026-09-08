@@ -29,7 +29,7 @@ export function FieldsetConferencia({
         <button
           type="button"
           onClick={onNovoItem}
-          className="flex items-center gap-1 border border-white bg-[#d2d2d2] px-2 py-0.5 text-xs text-[#1b1c1c]"
+          className="flex items-center gap-1 border border-white bg-[#d2d2d2] px-2 py-0.5 text-xs text-[#1b1c1c] hover:bg-[#c2c7d0]"
         >
           <Plus className="h-3 w-3" />
           Novo
@@ -37,7 +37,7 @@ export function FieldsetConferencia({
         <button
           type="button"
           onClick={onExcluirSelecionados}
-          className="flex items-center gap-1 border border-white bg-[#d2d2d2] px-2 py-0.5 text-xs text-[#1b1c1c]"
+          className="flex items-center gap-1 border border-white bg-[#d2d2d2] px-2 py-0.5 text-xs text-[#1b1c1c] hover:bg-[#c2c7d0]"
         >
           <Trash2 className="h-3 w-3" />
           Excluir
@@ -45,7 +45,7 @@ export function FieldsetConferencia({
         <button
           type="button"
           onClick={onPesquisarDecorativo}
-          className="flex items-center gap-1 border border-white bg-[#d2d2d2] px-2 py-0.5 text-xs text-[#1b1c1c]"
+          className="flex items-center gap-1 border border-white bg-[#d2d2d2] px-2 py-0.5 text-xs text-[#1b1c1c] hover:bg-[#c2c7d0]"
         >
           <Search className="h-3 w-3" />
           Pesquisar

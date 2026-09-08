@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { finalizarSessao } from "./session";
 import { registrarErro } from "./erros";
 import { Cenario, TipoEventoErro } from "./types";
@@ -24,6 +25,7 @@ export function SessaoProvider({
   children: ReactNode;
 }) {
   const finalizada = useRef(false);
+  const router = useRouter();
 
   const registrar = useCallback(
     (tipo: TipoEventoErro, detalhe?: string) => {
@@ -71,6 +73,35 @@ export function SessaoProvider({
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [sessaoId]);
+
+  useEffect(() => {
+    if (!sessaoId) return;
+
+    // beforeunload não dispara em navegação client-side do App Router — o
+    // botão Voltar do navegador entre /cenario-a|b e / usa popstate, não
+    // unload de página. Empilha uma entrada extra de histórico como "trava":
+    // ao voltar, intercepta e confirma antes de deixar sair de verdade. Se
+    // confirmado, navega direto pra home em vez de tentar "repetir" o back
+    // nativo — chamadas sucessivas a history.back() no mesmo turno podem ser
+    // descartadas pelo navegador, e a única saída real de /cenario-a|b
+    // sempre foi a home mesmo.
+    window.history.pushState(null, "", window.location.href);
+
+    function handlePopState() {
+      if (finalizada.current) return;
+      const confirmarSaida = window.confirm(
+        "Você tem uma tarefa em andamento. Se sair agora, o progresso não será salvo. Deseja realmente sair?",
+      );
+      if (confirmarSaida) {
+        router.push("/");
+      } else {
+        window.history.pushState(null, "", window.location.href);
+      }
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [sessaoId, router]);
 
   const value = useMemo(
     () => ({ sessaoId, cenario, registrarErro: registrar, finalizarSessao: finalizar }),

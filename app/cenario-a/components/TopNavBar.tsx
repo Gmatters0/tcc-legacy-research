@@ -22,7 +22,7 @@ export function TopNavBar({ onSalvar }: { onSalvar: () => void }) {
             key={item}
             type="button"
             onClick={() => handleElementoDecorativo(`menu.${item}`)}
-            className="px-2 py-0.5 text-xs text-[#42474f]"
+            className="px-2 py-0.5 text-xs text-[#42474f] hover:bg-[#d2d2d2]"
           >
             {item}
           </button>
@@ -34,7 +34,7 @@ export function TopNavBar({ onSalvar }: { onSalvar: () => void }) {
             <button
               type="button"
               onClick={() => handleElementoDecorativo("toolbar.ENT_NF-busca")}
-              className="ml-1 flex items-center"
+              className="ml-1 flex items-center hover:opacity-70"
             >
               <Search className="h-3.5 w-4 text-[#42474f]" />
             </button>
@@ -47,7 +47,7 @@ export function TopNavBar({ onSalvar }: { onSalvar: () => void }) {
             <button
               type="button"
               onClick={() => handleElementoDecorativo("toolbar.ENT_NF-seta")}
-              className="px-1 text-[10px] text-[#42474f]"
+              className="px-1 text-[10px] text-[#42474f] hover:bg-[#e5e5e5]"
             >
               ▾
             </button>
@@ -57,7 +57,7 @@ export function TopNavBar({ onSalvar }: { onSalvar: () => void }) {
             type="button"
             onClick={onSalvar}
             title="Salvar"
-            className="flex h-6 w-6 items-center justify-center border border-white bg-[#d2d2d2]"
+            className="flex h-6 w-6 items-center justify-center border border-white bg-[#d2d2d2] hover:bg-[#c2c7d0]"
           >
             <Save className="h-3 w-3 text-[#1b1c1c]" />
           </button>
@@ -65,7 +65,7 @@ export function TopNavBar({ onSalvar }: { onSalvar: () => void }) {
             type="button"
             title="Imprimir"
             onClick={() => handleElementoDecorativo("toolbar.Imprimir")}
-            className="flex h-6 w-6 items-center justify-center border border-white bg-[#d2d2d2]"
+            className="flex h-6 w-6 items-center justify-center border border-white bg-[#d2d2d2] hover:bg-[#c2c7d0]"
           >
             <Printer className="h-3 w-3 text-[#1b1c1c]" />
           </button>
@@ -73,7 +73,7 @@ export function TopNavBar({ onSalvar }: { onSalvar: () => void }) {
             type="button"
             title="Voltar"
             onClick={() => handleElementoDecorativo("toolbar.Voltar")}
-            className="flex h-6 w-6 items-center justify-center border border-white bg-[#d2d2d2]"
+            className="flex h-6 w-6 items-center justify-center border border-white bg-[#d2d2d2] hover:bg-[#c2c7d0]"
           >
             <ArrowLeft className="h-3 w-3 text-[#1b1c1c]" />
           </button>
@@ -81,7 +81,7 @@ export function TopNavBar({ onSalvar }: { onSalvar: () => void }) {
             type="button"
             title="Topo"
             onClick={() => handleElementoDecorativo("toolbar.Topo")}
-            className="flex h-6 w-6 items-center justify-center border border-white bg-[#d2d2d2]"
+            className="flex h-6 w-6 items-center justify-center border border-white bg-[#d2d2d2] hover:bg-[#c2c7d0]"
           >
             <ArrowUp className="h-3 w-3 text-[#1b1c1c]" />
           </button>
@@ -89,7 +89,7 @@ export function TopNavBar({ onSalvar }: { onSalvar: () => void }) {
             type="button"
             title="Ajuda"
             onClick={() => handleElementoDecorativo("toolbar.Ajuda")}
-            className="flex h-6 w-6 items-center justify-center border border-white bg-[#d2d2d2]"
+            className="flex h-6 w-6 items-center justify-center border border-white bg-[#d2d2d2] hover:bg-[#c2c7d0]"
           >
             <HelpCircle className="h-3 w-3 text-[#1b1c1c]" />
           </button>
@@ -97,7 +97,7 @@ export function TopNavBar({ onSalvar }: { onSalvar: () => void }) {
         <button
           type="button"
           onClick={() => handleElementoDecorativo("toolbar.Execute")}
-          className="border border-white bg-[#d2d2d2] px-3 py-1 text-[11px] text-[#1b1c1c]"
+          className="border border-white bg-[#d2d2d2] px-3 py-1 text-[11px] text-[#1b1c1c] hover:bg-[#c2c7d0]"
         >
           Execute
         </button>

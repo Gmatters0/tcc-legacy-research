@@ -30,7 +30,7 @@ export async function completarCenarioB(page: Page, numero: string) {
   await page.getByPlaceholder("Ex: 4052").fill(numero);
   await page.getByPlaceholder("Ex: TechSupplies Ind. Ltda.").fill("Fornecedor Teste E2E B");
   await page.locator('input[type="date"]').fill("2026-09-07");
-  await page.getByPlaceholder("Ex: 12450,00").fill("500,00");
+  await page.getByPlaceholder("Ex: 12.450,00").fill("500,00");
   await page.getByRole("button", { name: "Próximo →" }).click();
 
   await page.getByRole("button", { name: "Adicionar Item" }).click();

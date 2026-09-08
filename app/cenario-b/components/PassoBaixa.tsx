@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { ExternalLink, Package, Save, ShieldCheck } from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
+import { ExternalLink, Loader2, Package, Save, ShieldCheck } from "lucide-react";
 import { useSessao } from "@/lib/instrumentation/SessaoProvider";
 import { classificarTipoErroPorMensagem } from "@/lib/instrumentation/erros";
 import { TipoEventoErro } from "@/lib/instrumentation/types";
@@ -22,6 +22,10 @@ export function PassoBaixa({ notaFiscal, quantidadeSugerida, form, onChangeForm,
   const { armazem, lote, quantidade } = form;
   const [erros, setErros] = useState<string[]>([]);
   const [enviando, setEnviando] = useState(false);
+  // Guarda síncrono, independente do ciclo de render do React — bloqueia
+  // duplo clique/duplo submit mesmo no instante entre o clique e o
+  // `disabled` do botão realmente refletir no DOM.
+  const enviandoRef = useRef(false);
 
   function setArmazem(valor: string) {
     onChangeForm({ ...form, armazem: valor });
@@ -35,6 +39,7 @@ export function PassoBaixa({ notaFiscal, quantidadeSugerida, form, onChangeForm,
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (enviandoRef.current) return;
     setErros([]);
 
     if (!armazem) {
@@ -48,6 +53,7 @@ export function PassoBaixa({ notaFiscal, quantidadeSugerida, form, onChangeForm,
       return;
     }
 
+    enviandoRef.current = true;
     setEnviando(true);
     try {
       const response = await fetch(`/api/notas-fiscais/${notaFiscal.id}/baixa`, {
@@ -69,6 +75,7 @@ export function PassoBaixa({ notaFiscal, quantidadeSugerida, form, onChangeForm,
       await finalizarSessao();
       onConcluido();
     } finally {
+      enviandoRef.current = false;
       setEnviando(false);
     }
   }
@@ -165,9 +172,10 @@ export function PassoBaixa({ notaFiscal, quantidadeSugerida, form, onChangeForm,
             <button
               type="submit"
               disabled={enviando}
-              className="flex items-center gap-2 rounded-lg bg-[#16a34a] px-6 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-50"
+              aria-busy={enviando}
+              className="flex items-center gap-2 rounded-lg bg-[#16a34a] px-6 py-2 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Save className="h-3.5 w-3.5" />
+              {enviando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               {enviando ? "Salvando..." : "Salvar Lançamento"}
             </button>
           </div>

@@ -19,7 +19,7 @@ export function ErrorReviewModal({ erros, onFechar }: Props) {
           <span className="text-sm font-bold text-[#1b1c1c]">
             {etapa === "confirmar" ? "Erros ao salvar" : "Log de erros"}
           </span>
-          <button type="button" onClick={onFechar} aria-label="Fechar">
+          <button type="button" onClick={onFechar} aria-label="Fechar" className="rounded p-0.5 hover:bg-[#d2d2d2]">
             <X className="h-4 w-4 text-[#42474f]" />
           </button>
         </div>
@@ -36,14 +36,14 @@ export function ErrorReviewModal({ erros, onFechar }: Props) {
               <button
                 type="button"
                 onClick={onFechar}
-                className="border border-[#727780] bg-[#d2d2d2] px-4 py-1.5 text-xs text-[#1b1c1c]"
+                className="border border-[#727780] bg-[#d2d2d2] px-4 py-1.5 text-xs text-[#1b1c1c] hover:bg-[#c2c7d0]"
               >
                 Fechar
               </button>
               <button
                 type="button"
                 onClick={() => setEtapa("detalhe")}
-                className="border border-[#727780] bg-[#004ac6] px-4 py-1.5 text-xs text-white"
+                className="border border-[#727780] bg-[#004ac6] px-4 py-1.5 text-xs text-white hover:bg-[#003a9b]"
               >
                 Sim, verificar
               </button>
@@ -62,7 +62,7 @@ export function ErrorReviewModal({ erros, onFechar }: Props) {
               <button
                 type="button"
                 onClick={onFechar}
-                className="border border-[#727780] bg-[#d2d2d2] px-4 py-1.5 text-xs text-[#1b1c1c]"
+                className="border border-[#727780] bg-[#d2d2d2] px-4 py-1.5 text-xs text-[#1b1c1c] hover:bg-[#c2c7d0]"
               >
                 Fechar
               </button>

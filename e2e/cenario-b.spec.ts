@@ -21,7 +21,7 @@ async function preencherPasso1(page: Page, opts: { numero: string; fornecedor: s
   await page.getByPlaceholder("Ex: 4052").fill(opts.numero);
   await page.getByPlaceholder("Ex: TechSupplies Ind. Ltda.").fill(opts.fornecedor);
   await page.locator('input[type="date"]').fill("2026-09-07");
-  await page.getByPlaceholder("Ex: 12450,00").fill(opts.valorTotal);
+  await page.getByPlaceholder("Ex: 12.450,00").fill(opts.valorTotal);
 }
 
 test.describe("Cenário B — fluxo de sucesso", () => {
