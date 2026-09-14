@@ -16,12 +16,13 @@ enum PerfilUsuario {
 }
 
 model Usuario {
-  id        String        @id @default(cuid())
-  codigo    String        @unique
-  senhaHash String
-  ativo     Boolean       @default(true)
-  createdAt DateTime      @default(now())
-  sessoes   SessaoTeste[]
+  id              String           @id @default(cuid())
+  codigo          String           @unique
+  senhaHash       String
+  ativo           Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  sessoes         SessaoTeste[]
+  comparacaoFinal ComparacaoFinal?
 }
 
 model NotaFiscal {
@@ -58,15 +59,16 @@ model LancamentoEstoque {
 }
 
 model SessaoTeste {
-  id              String        @id @default(cuid())
+  id              String              @id @default(cuid())
   usuarioId       String
-  usuario         Usuario       @relation(fields: [usuarioId], references: [id])
+  usuario         Usuario             @relation(fields: [usuarioId], references: [id])
   perfilUsuario   PerfilUsuario
   cenario         String
   conjuntoTarefa  String
   timestampInicio DateTime
   timestampFim    DateTime?
   eventosErro     EventoErro[]
+  avaliacao       AvaliacaoPosTarefa?
 }
 
 model EventoErro {
@@ -76,4 +78,54 @@ model EventoErro {
   tipo      String
   timestamp DateTime    @default(now())
   detalhe   String?
+}
+
+// Aplicado automaticamente ao final de cada cenário, substituindo a antiga
+// tela de escolha "Voltar"/"Finalizar" — NASA-TLX (6 dimensões, 0-100) + SUS
+// (10 itens, 1-5, score calculado) + escala subjetiva própria (10 itens,
+// 1-5). Uma por SessaoTeste (cada cenário concluído gera a sua).
+model AvaliacaoPosTarefa {
+  id            String      @id @default(cuid())
+  sessaoId      String      @unique
+  sessao        SessaoTeste @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+  tlxMental     Float
+  tlxFisica     Float
+  tlxTemporal   Float
+  tlxDesempenho Float
+  tlxEsforco    Float
+  tlxFrustracao Float
+  susQ1         Int
+  susQ2         Int
+  susQ3         Int
+  susQ4         Int
+  susQ5         Int
+  susQ6         Int
+  susQ7         Int
+  susQ8         Int
+  susQ9         Int
+  susQ10        Int
+  susScore      Float
+  subjQ1        Int
+  subjQ2        Int
+  subjQ3        Int
+  subjQ4        Int
+  subjQ5        Int
+  subjQ6        Int
+  subjQ7        Int
+  subjQ8        Int
+  subjQ9        Int
+  subjQ10       Int
+  createdAt     DateTime    @default(now())
+}
+
+// Aplicada uma única vez por Usuario, depois que os dois cenários já foram
+// concluídos e avaliados — última etapa antes de finalizar a participação.
+model ComparacaoFinal {
+  id          String   @id @default(cuid())
+  usuarioId   String   @unique
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  preferencia String
+  porque      String
+  feedback    String?
+  createdAt   DateTime @default(now())
 }

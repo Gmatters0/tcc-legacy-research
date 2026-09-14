@@ -114,3 +114,20 @@ export async function buscarNotaFiscalPorNumero(numero: string) {
     return rows[0] ?? null;
   });
 }
+
+export async function contarAvaliacoes(usuarioId: string): Promise<number> {
+  return withDb(async (client) => {
+    const { rows } = await client.query(
+      'SELECT COUNT(*)::int AS n FROM "AvaliacaoPosTarefa" a JOIN "SessaoTeste" s ON s.id = a."sessaoId" WHERE s."usuarioId" = $1',
+      [usuarioId],
+    );
+    return rows[0].n;
+  });
+}
+
+export async function buscarComparacaoFinal(usuarioId: string) {
+  return withDb(async (client) => {
+    const { rows } = await client.query('SELECT * FROM "ComparacaoFinal" WHERE "usuarioId" = $1', [usuarioId]);
+    return rows[0] ?? null;
+  });
+}

@@ -38,7 +38,7 @@ const ITEM_VAZIO: ItemConferenciaA = {
 };
 
 function CenarioAConteudo() {
-  const { registrarErro, finalizarSessao } = useSessao();
+  const { registrarErro, finalizarSessao, sessaoId } = useSessao();
   const router = useRouter();
 
   const [numero, setNumero] = useState("");
@@ -166,7 +166,7 @@ function CenarioAConteudo() {
 
       setStatus("Concluído");
       await finalizarSessao();
-      router.push("/sucesso");
+      router.push(`/sucesso?sessaoId=${sessaoId}`);
     } catch {
       errosColetados.push({ campo: "geral", mensagem: "Falha de comunicação com o servidor." });
     } finally {

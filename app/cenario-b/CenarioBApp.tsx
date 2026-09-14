@@ -16,7 +16,7 @@ const FORM_VALIDACAO_INICIAL: FormValidacao = { numero: "", fornecedor: "", data
 const FORM_BAIXA_INICIAL: FormBaixa = { armazem: "", lote: "", quantidade: "" };
 
 function CenarioBConteudo() {
-  const { registrarErro } = useSessao();
+  const { registrarErro, sessaoId } = useSessao();
   const router = useRouter();
 
   const [passoAtual, setPassoAtual] = useState(1);
@@ -97,7 +97,7 @@ function CenarioBConteudo() {
               form={formBaixa}
               onChangeForm={setFormBaixa}
               onVoltar={() => setPassoAtual(2)}
-              onConcluido={() => router.push("/sucesso")}
+              onConcluido={() => router.push(`/sucesso?sessaoId=${sessaoId}`)}
             />
           )}
         </main>

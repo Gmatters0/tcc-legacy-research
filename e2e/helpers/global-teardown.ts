@@ -19,11 +19,14 @@ export default async function globalTeardown() {
       const sessoes = await client.query('SELECT id FROM "SessaoTeste" WHERE "usuarioId" = ANY($1)', [usuarioIds]);
       const sessaoIds = sessoes.rows.map((r) => r.id);
       if (sessaoIds.length) {
-        // EventoErro tem onDelete: Cascade a partir de SessaoTeste, mas apaga
-        // explicitamente por clareza (não depende de a constraint existir).
+        // EventoErro e AvaliacaoPosTarefa têm onDelete: Cascade a partir de
+        // SessaoTeste, mas apaga explicitamente por clareza (não depende de a
+        // constraint existir).
         await client.query('DELETE FROM "EventoErro" WHERE "sessaoId" = ANY($1)', [sessaoIds]);
+        await client.query('DELETE FROM "AvaliacaoPosTarefa" WHERE "sessaoId" = ANY($1)', [sessaoIds]);
         await client.query('DELETE FROM "SessaoTeste" WHERE id = ANY($1)', [sessaoIds]);
       }
+      await client.query('DELETE FROM "ComparacaoFinal" WHERE "usuarioId" = ANY($1)', [usuarioIds]);
       await client.query('DELETE FROM "Usuario" WHERE id = ANY($1)', [usuarioIds]);
     }
 

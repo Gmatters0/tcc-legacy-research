@@ -17,6 +17,7 @@ coletar métricas objetivas de desempenho e erro.
 - [Regras de negócio e validações](#regras-de-negócio-e-validações)
 - [Instrumentação de métricas](#instrumentação-de-métricas)
 - [Autenticação e ciclo de vida do participante](#autenticação-e-ciclo-de-vida-do-participante)
+- [Avaliação Pós-Tarefa](#avaliação-pós-tarefa)
 - [Painel administrativo](#painel-administrativo)
 - [Cenário A vs. Cenário B: o que muda e o que não muda](#cenário-a-vs-cenário-b-o-que-muda-e-o-que-não-muda)
 - [Persistência de navegação e aviso de reload](#persistência-de-navegação-e-aviso-de-reload)
@@ -158,12 +159,13 @@ enum PerfilUsuario {
 }
 
 model Usuario {
-  id        String        @id @default(cuid())
-  codigo    String        @unique // ex: "PJS-01" — NUNCA o nome real do participante
-  senhaHash String
-  ativo     Boolean       @default(true)
-  createdAt DateTime      @default(now())
-  sessoes   SessaoTeste[]
+  id              String           @id @default(cuid())
+  codigo          String           @unique // ex: "PJS-01" — NUNCA o nome real do participante
+  senhaHash       String
+  ativo           Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  sessoes         SessaoTeste[]
+  comparacaoFinal ComparacaoFinal?
 }
 
 model NotaFiscal {
@@ -200,15 +202,16 @@ model LancamentoEstoque {
 }
 
 model SessaoTeste {
-  id              String        @id @default(cuid())
+  id              String              @id @default(cuid())
   usuarioId       String
-  usuario         Usuario       @relation(fields: [usuarioId], references: [id])
+  usuario         Usuario             @relation(fields: [usuarioId], references: [id])
   perfilUsuario   PerfilUsuario
-  cenario         String        // "A" | "B"
+  cenario         String              // "A" | "B"
   conjuntoTarefa  String
   timestampInicio DateTime
   timestampFim    DateTime?
   eventosErro     EventoErro[]
+  avaliacao       AvaliacaoPosTarefa?
 }
 
 model EventoErro {
@@ -218,6 +221,36 @@ model EventoErro {
   tipo      String
   timestamp DateTime    @default(now())
   detalhe   String?
+}
+
+// Uma por SessaoTeste concluída — ver seção "Avaliação Pós-Tarefa".
+model AvaliacaoPosTarefa {
+  id            String      @id @default(cuid())
+  sessaoId      String      @unique
+  sessao        SessaoTeste @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+  tlxMental     Float
+  tlxFisica     Float
+  tlxTemporal   Float
+  tlxDesempenho Float
+  tlxEsforco    Float
+  tlxFrustracao Float
+  susQ1         Int
+  // ... susQ2..susQ10, mesma forma
+  susScore      Float
+  subjQ1        Int
+  // ... subjQ2..subjQ10, mesma forma
+  createdAt     DateTime    @default(now())
+}
+
+// Uma por Usuario, depois dos dois cenários concluídos e avaliados.
+model ComparacaoFinal {
+  id          String   @id @default(cuid())
+  usuarioId   String   @unique
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  preferencia String   // "A" | "B"
+  porque      String
+  feedback    String?
+  createdAt   DateTime @default(now())
 }
 ```
 
@@ -365,10 +398,12 @@ sem cadastro livre:
 3. Depois de logado, o participante escolhe o **perfil** (Técnico / Não técnico), o
    **cenário** e o **conjunto de tarefa**, e clica em "Iniciar Tarefa" — isso cria a
    `SessaoTeste` e começa a contagem do Time-on-Task.
-4. Ao concluir a tarefa com sucesso, o participante cai na tela **`/sucesso`**, com duas
-   opções: **"Voltar à tela inicial"** (para fazer o segundo cenário) ou **"Finalizar
-   participação"** (desativa o `Usuario`, impedindo login futuro, e encerra a sessão de
-   login, terminando em **`/obrigado`**, a tela final de agradecimento).
+4. Ao concluir a tarefa com sucesso, o participante cai na tela **`/sucesso`**, que dispara
+   automaticamente a [Avaliação Pós-Tarefa](#avaliação-pós-tarefa) (NASA-TLX + SUS +
+   questionário subjetivo) pro cenário que acabou de terminar. Ao final dela, o próprio fluxo
+   decide sozinho pra onde ir: de volta à home (se ainda sobra o segundo cenário) ou pra
+   Comparação Final seguida de `/obrigado` (se esse já era o último). Não existe mais escolha
+   manual de "voltar" ou "finalizar" — é automático, derivado da regra de não-repetição abaixo.
 
 ### Regra de não-repetição
 
@@ -390,6 +425,36 @@ raiz do projeto, faz uma checagem **otimista** (só verifica se o cookie de sess
 consultar o banco) antes de renderizar `/cenario-a`, `/cenario-b` ou `/sucesso`, redirecionando
 para a home quem não tiver sessão. A checagem **autoritativa** (o usuário realmente existe e
 segue ativo?) acontece nas API Routes, via `obterUsuarioAutenticado()`.
+
+## Avaliação Pós-Tarefa
+
+Aplicada automaticamente em `/sucesso` ao final de **cada** cenário — três instrumentos em
+sequência, conteúdo centralizado em `lib/avaliacao-config.ts`:
+
+1. **NASA-TLX** — 6 dimensões (Demanda Mental, Física, Temporal, Desempenho, Esforço,
+   Frustração), slider 0-100 cada, versão **Raw/sem ponderação por pares** (Hart, 2006). Cada
+   slider só conta como respondido depois que o participante efetivamente arrasta — evita viés
+   do valor inicial nunca ter sido escolhido de propósito. Tradução própria das descrições
+   originais de Hart & Staveland (1988); **diferente do SUS, não existe uma adaptação
+   transcultural formal única para português do Brasil** — cada grupo de pesquisa traduz por
+   conta própria, e isso deve constar assim na metodologia do TCC.
+2. **SUS** — 10 itens, Likert 1-5. **Tradução e adaptação transcultural validada para
+   português do Brasil**: Lourenço, D. F., Carmona, E. V., & Lopes, M. H. B. M. (2022).
+   *Translation and Cross-Cultural Adaptation of the System Usability Scale to Brazilian
+   Portuguese*. Aquichan, 22(2), e2228. <https://doi.org/10.5294/aqui.2022.22.2.8> — alfa de
+   Cronbach = 0,76. O score (0-100) é calculado no servidor pela fórmula padrão e salvo junto.
+3. **Questionário subjetivo** — 10 itens próprios (Likert 1-5), complementam SUS/TLX em pontos
+   que eles não cobrem diretamente: clareza de erro, confiança, adoção, satisfação geral.
+
+Ao enviar a avaliação, o sistema reconsulta o histórico de participação e decide sozinho o
+próximo passo (ver "Autenticação e ciclo de vida do participante" acima). Se esse era o
+**segundo** cenário, mostra em seguida a **Comparação Final**: preferência A/B, justificativa
+obrigatória e comentário livre opcional — uma por participante.
+
+Os dados ficam em dois models próprios (`AvaliacaoPosTarefa`, ligado 1-para-1 à `SessaoTeste`;
+`ComparacaoFinal`, ligado 1-para-1 ao `Usuario`) — ver "Modelo de dados". A API
+(`POST /api/sessoes/[id]/avaliacao`) confere que a sessão pertence ao usuário autenticado e já
+foi finalizada antes de aceitar, além da validação de faixa de valores de costume.
 
 ## Painel administrativo
 
@@ -470,17 +535,18 @@ simples.
 - Arquivos `*.test.ts` ficam **co-localizados** com o código que testam (ex.:
   `lib/business-logic/conferencia.test.ts` ao lado de `conferencia.ts`), sem uma pasta
   `__tests__` separada.
-- **O que está coberto**: as funções puras do domínio (cálculo de divergência, validação
-  de elegibilidade, classificação de tipo de erro, as duas heurísticas de
+- **O que está coberto** (62 testes): as funções puras do domínio (cálculo de divergência,
+  validação de elegibilidade, classificação de tipo de erro, as duas heurísticas de
   `ERRO_LOGICO_CADASTRO`, hash/verificação/geração de senha) e os caminhos de **rejeição de
   validação** das funções de negócio (`criarNotaFiscal`, `registrarConferenciaItens`,
-  `registrarBaixaEstoque`) — essas três lançam erro antes de qualquer chamada ao banco, então
-  os testes de rejeição não precisam mockar nada. Onde um teste precisa mesmo passar por uma
-  consulta ao banco (o algoritmo de geração de código sequencial em `criarUsuario`, o login em
-  `autenticarUsuario`, a consulta de histórico em `buscarHistoricoParticipacao`), o Prisma é
-  mockado — **nenhum teste grava no banco de desenvolvimento real**.
+  `registrarBaixaEstoque`, `registrarAvaliacao`, `registrarComparacaoFinal`) — todas lançam
+  erro antes de qualquer chamada ao banco, então os testes de rejeição não precisam mockar
+  nada. Onde um teste precisa mesmo passar por uma consulta ao banco (o algoritmo de geração de
+  código sequencial em `criarUsuario`, o login em `autenticarUsuario`, a consulta de histórico
+  em `buscarHistoricoParticipacao`), o Prisma é mockado — **nenhum teste grava no banco de
+  desenvolvimento real**.
 - **Deliberadamente fora desta camada**: os caminhos de sucesso (escrita real no banco) das
-  três funções de negócio citadas, e qualquer teste de UI — cobertos pelos smoke tests E2E.
+  funções de negócio citadas, e qualquer teste de UI — cobertos pelos smoke tests E2E.
 
 ```bash
 pnpm test
@@ -498,12 +564,14 @@ da suíte inteira, com sucesso ou falha — nunca toca em dado real.
   sessão de teste abandonada no banco inteiro como rede de segurança (a aplicação assume um
   único participante por vez, não é multi-tenant) — em paralelo, um teste apagaria a sessão em
   andamento de outro.
-- **Cobertura**: login/logout e proteção de rota; fluxo de sucesso completo (com e sem
-  divergência) em cada cenário; persistência de navegação do Cenário B; os **4 tipos de
+- **Cobertura** (32 testes): login/logout e proteção de rota; fluxo de sucesso completo (com e
+  sem divergência) em cada cenário; persistência de navegação do Cenário B; os **4 tipos de
   `EventoErro`** em cada cenário, verificando o disparo **e** a gravação real na tabela; regra
-  de não-repetição (trava de UI e rejeição no servidor mesmo contornando o client); telas de
-  encerramento (`/sucesso`, `/obrigado`, desativação de usuário); painel administrativo
-  (login, criação/ativação/desativação de usuário).
+  de não-repetição (trava de UI e rejeição no servidor mesmo contornando o client); o fluxo
+  completo dos dois cenários — Avaliação Pós-Tarefa automática, Comparação Final, desativação
+  de usuário e `/obrigado`; validação client-side e segurança no servidor (posse da sessão,
+  sessão não finalizada) da Avaliação Pós-Tarefa; painel administrativo (login,
+  criação/ativação/desativação de usuário).
 - `ADMIN_SENHA` é lido do `.env` real em tempo de execução — nunca hardcoded no arquivo de
   teste.
 
@@ -556,20 +624,22 @@ garantir que a base começa vazia, e confirme que `ADMIN_SENHA` foi trocada do p
 /app
   page.tsx                 → home: login → setup de sessão (perfil, cenário, conjunto de tarefa)
   /components               LoginForm, IniciarTarefaForm
-  /sucesso                 → tela de sucesso pós-tarefa
+  /sucesso                 → Avaliação Pós-Tarefa automática (NASA-TLX + SUS + subjetivo +
+                              Comparação Final) — decide sozinho o próximo passo
   /obrigado                → tela final de agradecimento (não exige login)
   /admin                   → painel administrativo (login próprio)
   /api
-    /auth                   login, logout, me, finalizar-participacao
+    /auth                   login, logout, me, finalizar-participacao, comparacao-final
     /admin                  login, logout, me, sessoes, export, usuarios
     /notas-fiscais          CRUD de nota fiscal, itens, baixa
-    /sessoes                criação/finalização/abandono de SessaoTeste
+    /sessoes                criação/finalização/abandono de SessaoTeste, avaliação pós-tarefa
     /eventos-erro           registro de EventoErro
   /cenario-a                tela única densa (SAP/Protheus-like)
   /cenario-b                wizard de 3 passos (moderno)
 /lib
   prisma.ts                 singleton do Prisma Client
   task-config.ts             opções compartilhadas (cenários, conjuntos, perfis, depósitos)
+  avaliacao-config.ts        conteúdo da Avaliação Pós-Tarefa (itens SUS/TLX/subjetivo)
   api-response.ts             helper de resposta de erro estruturado
   /auth                      autenticação de participante
   /admin                     autenticação do painel administrativo
@@ -603,9 +673,15 @@ playwright.config.ts          configuração dos smoke tests E2E
   de cada conjunto (duas notas fiscais fictícias, com itens e divergências propositais) foram
   definidos pelo pesquisador e são entregues ao participante fora do sistema
   (impresso ou verbalmente), por decisão de desenho do experimento.
-- **A desativação de um `Usuario` é definitiva até reativação manual**: — depois de "Finalizar
-  participação", aquele código de acesso para de funcionar; só o painel admin pode reverter
-  isso.
+- **A desativação de um `Usuario` é definitiva até reativação manual**: acontece
+  automaticamente ao final da Comparação Final (depois do segundo cenário) — dali em diante
+  aquele código de acesso para de funcionar; só o painel admin pode reverter isso.
+- **Não existe mais escolha manual entre "voltar" e "finalizar" em `/sucesso`**: é 100%
+  automático, derivado de quantos cenários/conjuntos ainda restam. Efeito colateral conhecido:
+  se o participante fechar o navegador entre terminar o segundo cenário e terminar a Comparação
+  Final, o `Usuario` fica com as duas sessões concluídas mas ainda **ativo** — ao logar de novo
+  vê a mensagem de "participação concluída" na home, mas não há como retomar a Comparação Final
+  pendente por essa tela. Cenário raro (piloto sempre acompanhado) e não tratado.
 - **Os smoke tests E2E rodam sequencialmente, nunca em paralelo** — reflexo direto da
   rede de segurança de `POST /api/sessoes` (limpa qualquer sessão de teste pendente no banco
   inteiro), que por sua vez reflete o uso real do sistema: um único participante por vez. Ver

@@ -67,9 +67,11 @@ Todos via `pnpm` (nunca `npm`):
 | `pnpm run test:e2e` | Roda a suíte de smoke tests E2E (Playwright, ver seção "Testes Automatizados") |
 
 **Antes de qualquer coleta de dados real com participantes, rode `pnpm run db:reset`** para
-garantir que a base começa vazia — o script apaga `EventoErro`, `ItemRecebido`,
-`LancamentoEstoque`, `NotaFiscal` e `SessaoTeste`, nessa ordem (respeita FKs), e mostra a
-contagem antes/depois. Ver `scripts/reset-db.js`.
+garantir que a base começa vazia — o script apaga `EventoErro`, `AvaliacaoPosTarefa`,
+`ItemRecebido`, `LancamentoEstoque`, `NotaFiscal`, `SessaoTeste` e `ComparacaoFinal`, nessa
+ordem (respeita FKs — `ComparacaoFinal` referencia `Usuario`, não `SessaoTeste`, por isso entra
+explicitamente na lista em vez de cair por cascade), e mostra a contagem antes/depois. Ver
+`scripts/reset-db.js`.
 
 O banco é um Postgres hospedado (Prisma Postgres) — `DATABASE_URL` em `.env` é a connection
 string completa (nunca commitada). O app em si não tem backend separado: o mesmo processo
@@ -122,9 +124,12 @@ mudou:
                                        e trava cenário/conjunto já concluídos (ver "Regra de
                                        Não-Repetição"), ou mostra mensagem de participação
                                        concluída se não sobra nenhuma combinação
-  /sucesso                          → tela de sucesso pós-baixa (client component; rota
-                                       protegida por proxy.ts — exige login), sem sessaoId no
-                                       state: "Voltar à tela inicial" ou "Finalizar participação"
+  /sucesso                          → Avaliação Pós-Tarefa automática (ver seção própria),
+                                       protegida por proxy.ts — exige login
+    page.tsx                        → só embrulha SucessoApp em <Suspense> (useSearchParams)
+    SucessoApp.tsx                  → orquestrador: passo atual (tlx/sus/subjetivo/comparação),
+                                       decide sozinho pra onde ir ao final (home ou /obrigado)
+    /components                     → PassoTlx, PassoLikert (SUS e subjetivo), PassoComparacaoFinal
   /obrigado                         → tela de agradecimento final (server component estático,
                                        NÃO protegida — o usuário já foi desativado e deslogado
                                        antes de chegar aqui)
@@ -146,7 +151,9 @@ mudou:
       logout/route.ts                → POST apaga o cookie de sessão
       me/route.ts                    → GET usuário autenticado (401 se não logado/inativo)
       finalizar-participacao/route.ts → POST desativa o Usuario atual e encerra a sessão de
-                                       login (chamado a partir de /sucesso)
+                                       login (chamado a partir de /sucesso, depois da Comparação
+                                       Final)
+      comparacao-final/route.ts      → POST registra a Comparação Final (uma por Usuario)
     /notas-fiscais
       route.ts                      → POST cria NF
       /[id]/route.ts                 → GET NF completa (itens + lançamentos)
@@ -157,6 +164,8 @@ mudou:
                                        abandonadas
       /[id]/route.ts                 → PATCH finaliza SessaoTeste (timestampFim)
       /[id]/abandonar/route.ts       → POST remove SessaoTeste não finalizada (via beacon)
+      /[id]/avaliacao/route.ts       → POST registra AvaliacaoPosTarefa (checa posse da sessão
+                                       e que já foi finalizada)
     /eventos-erro/route.ts          → POST registra EventoErro
   /cenario-a                        → tela única densa (client component; rota protegida por
                                        proxy.ts — exige login)
@@ -173,6 +182,8 @@ mudou:
   prisma.ts                         → singleton do PrismaClient (com driver adapter)
   task-config.ts                    → CENARIOS, CONJUNTOS_TAREFA, PERFIS_USUARIO,
                                        ARMAZENS_DISPONIVEIS (compartilhado entre A e B)
+  avaliacao-config.ts               → conteúdo da Avaliação Pós-Tarefa: SUS_ITENS,
+                                       SUBJETIVO_ITENS, TLX_ITENS, calcularSusScore()
   api-response.ts                   → helper de resposta de erro estruturado da API
   /auth                             → autenticação de participante (ver seção "Autenticação")
     constants.ts                    → SESSAO_COOKIE_NAME (compartilhado entre session.ts e proxy.ts)
@@ -191,6 +202,8 @@ mudou:
   /business-logic                   → única fonte de regras de negócio (ver seção abaixo)
     types.ts, notaFiscal.ts, conferencia.ts, estoque.ts, elegibilidade.ts (regra de
     não-repetição — ver seção "Regra de Não-Repetição")
+    avaliacao.ts                    → validação + registrarAvaliacao() (NASA-TLX/SUS/subjetivo)
+    comparacaoFinal.ts              → validação + registrarComparacaoFinal()
   /instrumentation                  → única fonte de instrumentação de métricas
     types.ts                        → enum TipoEventoErro, tipos de sessão
     session.ts                      → criarSessao(), finalizarSessao()
@@ -227,17 +240,21 @@ playwright.config.ts                → config do Playwright (raiz do projeto, v
   cenario-b.spec.ts                 → fluxo de sucesso (sem divergência), persistência ao
                                        voltar no Stepper, + os 4 tipos de EventoErro no B
   nao-repeticao-e-encerramento.spec.ts → regra de não-repetição (trava de UI + rejeição no
-                                       servidor) e telas de encerramento (/sucesso, /obrigado,
-                                       desativação de Usuario)
+                                       servidor) e o fluxo completo dos dois cenários até
+                                       /obrigado (comparação final, desativação de Usuario)
+  avaliacao-pos-tarefa.spec.ts      → validação client-side (TLX/SUS não avançam incompletos)
+                                       e segurança no servidor (posse da sessão, sessão não
+                                       finalizada) da Avaliação Pós-Tarefa
   admin.spec.ts                     → login do painel, criação/ativação/desativação de
                                        Usuario, formato do código gerado
   /helpers
     db.ts                           → cria Usuario de teste via pg cru (mesmo formato de hash
                                        de lib/auth/password.ts), consultas de asserção
     auth.ts                         → login()/iniciarTarefa() reutilizados por todos os specs
-    fluxo.ts                        → completarCenarioA()/completarCenarioB() — preenche e
-                                       submete um fluxo completo, usado pelos specs que só
-                                       precisam chegar em /sucesso sem testar o fluxo em si
+    fluxo.ts                        → completarCenarioA()/completarCenarioB() (preenchem e
+                                       submetem até /sucesso) + completarAvaliacaoPosTarefa()/
+                                       completarComparacaoFinal() (avançam a avaliação que
+                                       aparece em seguida)
     global-teardown.ts              → apaga todo dado criado pelos testes (prefixos
                                        reconhecíveis, nunca dado real) ao final da suíte
 ```
@@ -251,12 +268,13 @@ enum PerfilUsuario {
 }
 
 model Usuario {
-  id        String        @id @default(cuid())
-  codigo    String        @unique // ex: "PJS-01" — NUNCA o nome real
-  senhaHash String
-  ativo     Boolean       @default(true)
-  createdAt DateTime      @default(now())
-  sessoes   SessaoTeste[]
+  id              String           @id @default(cuid())
+  codigo          String           @unique // ex: "PJS-01" — NUNCA o nome real
+  senhaHash       String
+  ativo           Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  sessoes         SessaoTeste[]
+  comparacaoFinal ComparacaoFinal?
 }
 
 model NotaFiscal {
@@ -293,15 +311,64 @@ model LancamentoEstoque {
 }
 
 model SessaoTeste {
-  id              String        @id @default(cuid())
+  id              String              @id @default(cuid())
   usuarioId       String
-  usuario         Usuario       @relation(fields: [usuarioId], references: [id])
+  usuario         Usuario             @relation(fields: [usuarioId], references: [id])
   perfilUsuario   PerfilUsuario
-  cenario         String        // "A" | "B"
+  cenario         String              // "A" | "B"
   conjuntoTarefa  String
   timestampInicio DateTime
   timestampFim    DateTime?
   eventosErro     EventoErro[]
+  avaliacao       AvaliacaoPosTarefa?
+}
+
+// Aplicado automaticamente ao final de cada cenário (ver "Avaliação Pós-Tarefa") — uma por
+// SessaoTeste. susQ1..susQ10/subjQ1..subjQ10 são colunas individuais (não JSON), pensado pra
+// exportação/análise direta.
+model AvaliacaoPosTarefa {
+  id            String      @id @default(cuid())
+  sessaoId      String      @unique
+  sessao        SessaoTeste @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+  tlxMental     Float
+  tlxFisica     Float
+  tlxTemporal   Float
+  tlxDesempenho Float
+  tlxEsforco    Float
+  tlxFrustracao Float
+  susQ1         Int
+  susQ2         Int
+  susQ3         Int
+  susQ4         Int
+  susQ5         Int
+  susQ6         Int
+  susQ7         Int
+  susQ8         Int
+  susQ9         Int
+  susQ10        Int
+  susScore      Float       // calculado no servidor, fórmula padrão SUS (0-100)
+  subjQ1        Int
+  subjQ2        Int
+  subjQ3        Int
+  subjQ4        Int
+  subjQ5        Int
+  subjQ6        Int
+  subjQ7        Int
+  subjQ8        Int
+  subjQ9        Int
+  subjQ10       Int
+  createdAt     DateTime    @default(now())
+}
+
+// Uma única vez por Usuario, depois que os dois cenários já foram concluídos e avaliados.
+model ComparacaoFinal {
+  id          String   @id @default(cuid())
+  usuarioId   String   @unique
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  preferencia String   // "A" | "B"
+  porque      String
+  feedback    String?
+  createdAt   DateTime @default(now())
 }
 
 model EventoErro {
@@ -494,18 +561,84 @@ essas telas ficam fora do que está sendo comparado, então usam o visual neutro
 home (zinc, sem referência de Figma):
 
 - **Cenário A** (`CenarioAApp.tsx`): depois de `finalizarSessao()` bem-sucedido em
-  `handleSalvar`, `router.push("/sucesso")`.
-- **Cenário B** (`CenarioBApp.tsx` → `PassoBaixa.tsx`): mesma coisa — o antigo card inline
-  "Entrada de mercadoria concluída" (mostrado dentro da própria tela) foi substituído por
-  navegação para `/sucesso`; o estado `concluido` que controlava esse card foi removido por
-  ficar morto depois da mudança.
-- **`/sucesso`**: duas opções. "Voltar à tela inicial" só faz `router.push("/")` — a home já
-  recalcula sozinha o que falta fazer (ver "Regra de Não-Repetição"), nenhuma lógica adicional
-  necessária aqui. "Finalizar participação" chama `POST /api/auth/finalizar-participacao`
-  (desativa o `Usuario` + encerra o cookie) e só então navega para `/obrigado`.
+  `handleSalvar`, `router.push(\`/sucesso?sessaoId=${sessaoId}\`)`.
+- **Cenário B** (`CenarioBApp.tsx` → `PassoBaixa.tsx`): mesma coisa, mesmo `sessaoId` na URL.
+- **`/sucesso`** (`SucessoApp.tsx`, `page.tsx` só embrulha em `<Suspense>` — necessário porque
+  o componente usa `useSearchParams()`, mesmo padrão de `/cenario-a` e `/cenario-b`): **não é
+  mais uma tela de escolha** — dispara automaticamente a Avaliação Pós-Tarefa (ver seção
+  abaixo) pro `sessaoId` que acabou de terminar. Ao final da avaliação, o próprio fluxo decide
+  pra onde ir sem intervenção do participante:
+  - Se ainda sobra cenário/conjunto disponível (`GET /api/auth/me` reconsultado depois do
+    envio) → `router.push("/")` — a home já pré-seleciona e trava o que resta (ver "Regra de
+    Não-Repetição"), igual antes.
+  - Se não sobra mais nada (era o segundo/último cenário) → mostra a Comparação Final (mesmo
+    componente, passo seguinte) em vez de voltar pra home. Ao enviá-la, chama
+    `POST /api/auth/finalizar-participacao` (desativa o `Usuario` + encerra o cookie) e só
+    então navega para `/obrigado`.
 - **`/obrigado`**: tela final, estática, deliberadamente **fora** do `matcher` de `proxy.ts` —
   se fosse protegida, o redirect aconteceria antes do usuário conseguir ler a mensagem, já que
   nesse ponto ele acabou de ser desautenticado.
+- **Não existe mais botão manual de "Finalizar participação" ou "Voltar à tela inicial"** — a
+  decisão é 100% automática, derivada da regra de não-repetição já existente. Efeito colateral
+  conhecido: se o participante fechar o navegador **entre** terminar o segundo cenário e
+  terminar a Comparação Final, o `Usuario` fica com as duas sessões concluídas mas **ainda
+  ativo** (nunca chegou a `finalizar-participacao`) — ao logar de novo, `IniciarTarefaForm`
+  mostra a mensagem de "participação concluída" (não tem mais cenário/conjunto pra oferecer),
+  mas não há como retomar a Comparação Final pendente por essa tela. Cenário raro (piloto é
+  sempre acompanhado, presencial ou remoto) e não tratado — retomar exigiria guardar em qual
+  etapa o participante parou, fora do escopo pedido.
+
+## Avaliação Pós-Tarefa
+
+Aplicada automaticamente ao final de **cada** cenário, em `/sucesso` — substitui a antiga tela
+de escolha manual. Conteúdo centralizado em `lib/avaliacao-config.ts`, componentes em
+`app/sucesso/components/`, orquestração em `app/sucesso/SucessoApp.tsx`. Três passos
+sequenciais, sempre na mesma ordem:
+
+1. **NASA-TLX** (`PassoTlx.tsx`) — 6 dimensões (Demanda Mental, Física, Temporal, Desempenho,
+   Esforço, Frustração), slider 0-100 cada. Versão **Raw/sem ponderação por pares** (Hart,
+   2006) — mais rápida que o TLX completo (que pede 15 comparações par-a-par), prática
+   documentada na literatura. Tradução própria das 6 descrições originais de Hart & Staveland
+   (1988) — **diferente do SUS, não existe uma adaptação transcultural formal única pra
+   português do Brasil** (é ferramenta aberta da NASA, cada grupo traduz por conta própria);
+   registrado como tal em `lib/avaliacao-config.ts` e deve constar assim na metodologia do TCC.
+   Cada slider começa em 50 mas só conta como respondido depois que o participante efetivamente
+   arrasta (`tlxTocado` por dimensão) — evita viés do valor default nunca ter sido escolhido de
+   propósito.
+2. **SUS** (`PassoLikert.tsx`, reaproveitado) — 10 itens, Likert 1-5. **Tradução e adaptação
+   transcultural validada para português do Brasil**: Lourenço, D. F., Carmona, E. V., & Lopes,
+   M. H. B. M. (2022). *Translation and Cross-Cultural Adaptation of the System Usability Scale
+   to Brazilian Portuguese*. Aquichan, 22(2), e2228. <https://doi.org/10.5294/aqui.2022.22.2.8>
+   — alfa de Cronbach = 0,76. Score calculado no servidor
+   (`calcularSusScore` em `lib/avaliacao-config.ts`, fórmula padrão: ímpares `valor-1`, pares
+   `5-valor`, soma × 2,5 → 0-100) e persistido junto (`AvaliacaoPosTarefa.susScore`).
+3. **Questionário subjetivo** (mesmo `PassoLikert.tsx`) — 10 itens próprios, Likert 1-5,
+   complementam SUS/TLX em pontos que eles não cobrem diretamente (clareza de erro, confiança,
+   adoção). Ao enviar (`POST /api/sessoes/[id]/avaliacao`), o servidor reconsulta
+   `GET /api/auth/me` pra decidir se volta pra home ou segue pra Comparação Final (ver "Telas
+   de Encerramento").
+
+**Comparação Final** (`PassoComparacaoFinal.tsx`) — só aparece depois do **segundo** cenário
+avaliado: preferência A/B + justificativa obrigatória + comentário livre opcional
+(`POST /api/auth/comparacao-final`), uma por `Usuario` (`@unique` em `usuarioId`).
+
+**Modelo de dados** (ver "Modelo de Dados"): `AvaliacaoPosTarefa` tem FK `@unique` pra
+`SessaoTeste` (uma por sessão concluída, `onDelete: Cascade`); `ComparacaoFinal` tem FK
+`@unique` pra `Usuario`. Campos de SUS/subjetivo são colunas individuais (`susQ1`..`susQ10`,
+`subjQ1`..`subjQ10`) em vez de JSON — pensado pra exportação/análise direta em CSV sem parsear
+nada, mesmo espírito do resto do schema.
+
+**Validação** (`lib/business-logic/avaliacao.ts`, `comparacaoFinal.ts`, mesmo padrão de
+`BusinessLogicError` do resto de `business-logic`): TLX exige as 6 chaves com valor 0-100; SUS
+e subjetivo exigem exatamente 10 valores 1-5 cada; a API de avaliação também verifica que a
+`SessaoTeste` existe, **pertence ao usuário autenticado** (não só que alguém está logado — numa
+requisição direta contornando a UI, dá pra tentar mandar `sessaoId` de outra pessoa) e já foi
+finalizada (`timestampFim` não nulo) antes de aceitar.
+
+**Artifact externo (histórico)**: antes dessa integração, o mesmo instrumento (SUS + TLX +
+subjetivo) rodou como um Claude Artifact autônomo, fora do projeto, com banco próprio — foi o
+protótipo que validou o conteúdo/tradução antes de portar pra cá. Não é mais o caminho
+principal; ficou só como referência/backup.
 
 ## Painel Administrativo
 
@@ -559,9 +692,9 @@ combina melhor com Turbopack).
 - **Cobertura atual**: funções puras (`calcularDivergencia`, `validarElegibilidade`,
   `classificarTipoErroPorMensagem`, `pareceCampoTrocado`, `fornecedorPareceNumeroNota`,
   `hashSenha`/`verificarSenha`/`gerarSenhaAleatoria`) e os caminhos de **rejeição de
-  validação** de `criarNotaFiscal`, `registrarConferenciaItens` e `registrarBaixaEstoque` —
-  esses três lançam `BusinessLogicError` antes de qualquer `await prisma...`, então não
-  precisam mockar nada nem tocam no banco real.
+  validação** de `criarNotaFiscal`, `registrarConferenciaItens`, `registrarBaixaEstoque`,
+  `registrarAvaliacao` e `registrarComparacaoFinal` — todos lançam `BusinessLogicError` antes
+  de qualquer `await prisma...`, então não precisam mockar nada nem tocam no banco real.
 - **Mock do Prisma** (`vi.mock("@/lib/prisma", ...)`) só onde o teste precisa mesmo passar por
   uma consulta — `criarUsuario` (o algoritmo de sequencial por grupo de iniciais, apontado como
   ponto de risco na pesquisa da Sprint de testes), `autenticarUsuario` e
@@ -592,10 +725,13 @@ dev`, subido automaticamente pelo `webServer` do Playwright) conectado ao **Post
   no Stepper; os **4 tipos de `EventoErro`** em cada cenário, verificando não só o disparo mas
   a gravação real na tabela (`buscarEventosErro` + `expect.poll`); regra de não-repetição —
   trava de UI e rejeição autoritativa no servidor mesmo contornando o client
-  (`nao-repeticao-e-encerramento.spec.ts`); telas de encerramento (`/sucesso`,
-  `/obrigado`, desativação de `Usuario` e bloqueio de novo login); painel administrativo —
-  login, criação de usuário (formato do código, ausência de caracteres ambíguos na senha),
-  toggle ativar/desativar (`admin.spec.ts`).
+  (`nao-repeticao-e-encerramento.spec.ts`); o fluxo completo dos dois cenários — Avaliação
+  Pós-Tarefa automática em cada um, Comparação Final, desativação de `Usuario`, bloqueio de
+  novo login e `/obrigado` (mesmo arquivo); validação client-side (TLX/SUS não avançam
+  incompletos) e segurança no servidor da avaliação — posse da sessão, sessão ainda não
+  finalizada (`avaliacao-pos-tarefa.spec.ts`); painel administrativo — login, criação de
+  usuário (formato do código, ausência de caracteres ambíguos na senha), toggle
+  ativar/desativar (`admin.spec.ts`).
 - **`ADMIN_SENHA` lido de `process.env`** (via `dotenv/config` em `playwright.config.ts`) —
   nunca hardcoded no arquivo de teste, é o mesmo segredo real do `.env`.
 - **Depois de rodar**, `pnpm run db:reset -- --yes` como rede de segurança extra antes de
@@ -627,7 +763,7 @@ export de assets).
 - Scaffold completo (Next.js + TS + Tailwind v4 + Prisma 7/PostgreSQL + pnpm).
 - Migração de SQLite local para Postgres hospedado (Prisma Postgres) — ver "Migração SQLite →
   Postgres".
-- Schema de dados completo (5 models + enum), migrations aplicadas.
+- Schema de dados completo (7 models + enum), migrations aplicadas.
 - Camada de lógica de negócio compartilhada (`lib/business-logic`) com todas as regras de
   validação da seção acima.
 - API compartilhada completa (`/api/notas-fiscais`, `/api/sessoes`, `/api/eventos-erro` e
@@ -642,9 +778,10 @@ export de assets).
 - Home page com login e, após autenticado, setup de sessão (perfil, cenário, conjunto de
   tarefa) — cenário e conjunto já concluídos vêm travados; se não sobra nada, mostra mensagem
   de participação concluída.
-- Telas de encerramento: `/sucesso` (voltar à home ou finalizar participação, com desativação
-  automática do `Usuario`) e `/obrigado` (agradecimento final) — ver seção "Telas de
-  Encerramento".
+- Avaliação Pós-Tarefa automática (NASA-TLX + SUS + questionário subjetivo de 10 itens, e
+  Comparação Final depois do segundo cenário) em `/sucesso`, decidindo sozinha entre voltar pra
+  home ou seguir pra `/obrigado` (com desativação automática do `Usuario`) — ver seção
+  "Avaliação Pós-Tarefa" e "Telas de Encerramento".
 - Painel administrativo (`/admin`, login próprio via `ADMIN_SENHA`): grid de sessões com
   duração e erros por tipo, export CSV/JSON (tudo ou por participante), criação de `Usuario`
   com código/senha gerados automaticamente, ativar/desativar manual — ver seção "Painel
@@ -664,12 +801,12 @@ export de assets).
   real.
 - Verificação funcional completa (type-check, lint e fluxo ponta a ponta) rodada ao vivo em
   ambos os cenários após cada rodada de mudanças.
-- Testes automatizados unitários (Vitest) das camadas `business-logic`, `instrumentation` e
-  `auth` — ver seção "Testes Automatizados".
-- Smoke tests E2E (Playwright): 30 testes cobrindo login/proteção de rota, fluxo de sucesso e
-  os 4 tipos de `EventoErro` em cada cenário, regra de não-repetição, telas de encerramento e
-  painel administrativo — todos passando contra o Postgres real. Ver seção "Testes
-  Automatizados".
+- Testes automatizados unitários (Vitest, 62 testes) das camadas `business-logic`,
+  `instrumentation` e `auth` — ver seção "Testes Automatizados".
+- Smoke tests E2E (Playwright): 32 testes cobrindo login/proteção de rota, fluxo de sucesso e
+  os 4 tipos de `EventoErro` em cada cenário, regra de não-repetição, o fluxo completo de
+  Avaliação Pós-Tarefa + Comparação Final + encerramento, e painel administrativo — todos
+  passando contra o Postgres real. Ver seção "Testes Automatizados".
 
 ## O que ainda falta implementar (fora de escopo até agora)
 

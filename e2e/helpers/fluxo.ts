@@ -45,3 +45,39 @@ export async function completarCenarioB(page: Page, numero: string) {
   await page.getByPlaceholder("Ex: Lote de Estoque A").fill("Lote Teste E2E B");
   await page.getByRole("button", { name: "Salvar Lançamento" }).click();
 }
+
+// Preenche um grupo de escalas Likert (radios ocultos via sr-only, clicados
+// com force pra ignorar a checagem de visibilidade) — usado pelo SUS e pelo
+// questionário subjetivo, ambos 10 itens de 5 opções.
+async function preencherLikert(page: Page, grupos: number, valor: number) {
+  const radios = page.locator('input[type="radio"]');
+  for (let g = 0; g < grupos; g++) {
+    await radios.nth(g * 5 + (valor - 1)).check({ force: true });
+  }
+}
+
+// Completa a avaliação pós-tarefa (NASA-TLX → SUS → subjetivo) que aparece
+// automaticamente em /sucesso ao final de cada cenário. Assume que a página
+// já está no Passo 1 (TLX).
+export async function completarAvaliacaoPosTarefa(page: Page) {
+  const sliders = page.locator('input[type="range"]');
+  const valoresTlx = ["30", "10", "40", "20", "35", "15"];
+  for (let i = 0; i < valoresTlx.length; i++) {
+    await sliders.nth(i).fill(valoresTlx[i]);
+  }
+  await page.getByRole("button", { name: "Próximo →" }).click();
+
+  await preencherLikert(page, 10, 4);
+  await page.getByRole("button", { name: "Próximo →" }).click();
+
+  await preencherLikert(page, 10, 3);
+  await page.getByRole("button", { name: "Enviar avaliação" }).click();
+}
+
+// Completa a comparação final (só aparece depois do segundo cenário +
+// avaliação) e conclui a participação.
+export async function completarComparacaoFinal(page: Page, preferencia: "A" | "B") {
+  await page.locator(`input[type="radio"][value="${preferencia}"]`).check({ force: true });
+  await page.getByPlaceholder("O que pesou na sua preferência?").fill("Motivo de teste E2E.");
+  await page.getByRole("button", { name: "Enviar e concluir participação" }).click();
+}

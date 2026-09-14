@@ -38,7 +38,7 @@ test.describe("Cenário A — fluxo de sucesso", () => {
     await baixaInputs.nth(1).fill("Lote Teste E2E");
 
     await page.getByTitle("Salvar").click();
-    await expect(page).toHaveURL("/sucesso", { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/sucesso\?sessaoId=/, { timeout: 15_000 });
 
     const usuarioAtualizado = await buscarUltimaSessao(usuario.id);
     expect(usuarioAtualizado?.timestampFim).not.toBeNull();

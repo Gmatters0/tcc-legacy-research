@@ -11,8 +11,18 @@ const readline = require("node:readline");
 const { Client } = require("pg");
 
 // Ordem respeita as dependências de chave estrangeira (filhos antes dos pais)
-// mesmo onde não há ON DELETE CASCADE configurado.
-const TABELAS_EM_ORDEM_DE_EXCLUSAO = ["EventoErro", "ItemRecebido", "LancamentoEstoque", "NotaFiscal", "SessaoTeste"];
+// mesmo onde não há ON DELETE CASCADE configurado. ComparacaoFinal referencia
+// Usuario (não SessaoTeste) — não seria limpa por cascade ao apagar as
+// sessões, por isso entra explicitamente na lista.
+const TABELAS_EM_ORDEM_DE_EXCLUSAO = [
+  "EventoErro",
+  "AvaliacaoPosTarefa",
+  "ItemRecebido",
+  "LancamentoEstoque",
+  "NotaFiscal",
+  "SessaoTeste",
+  "ComparacaoFinal",
+];
 
 async function contarRegistros(client) {
   const contagens = {};
