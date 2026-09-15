@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { obterUsuarioAutenticado } from "@/lib/auth/session";
 
 export async function POST(request: NextRequest) {
-  if (!(await obterUsuarioAutenticado())) {
+  const usuario = await obterUsuarioAutenticado();
+  if (!usuario) {
     return NextResponse.json({ erros: [{ campo: "geral", mensagem: "Não autenticado." }] }, { status: 401 });
   }
 
@@ -15,6 +16,11 @@ export async function POST(request: NextRequest) {
       { erros: [{ campo: "geral", mensagem: "sessaoId e tipo são obrigatórios." }] },
       { status: 400 },
     );
+  }
+
+  const sessao = await prisma.sessaoTeste.findUnique({ where: { id: sessaoId } });
+  if (!sessao || sessao.usuarioId !== usuario.id) {
+    return NextResponse.json({ erros: [{ campo: "sessaoId", mensagem: "Sessão não encontrada." }] }, { status: 404 });
   }
 
   const evento = await prisma.eventoErro.create({

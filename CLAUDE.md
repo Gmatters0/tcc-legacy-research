@@ -443,7 +443,8 @@ ordem. Todo elemento decorativo tem handler (`registrarErro('CLIQUE_FORA_FLUXO',
   (F3/F5/F7/F12 — **F2 é funcional**, aciona o salvamento real), botão "Pesquisar" da
   Conferência.
 - **Cenário B**: itens do SideNavBar, ícones do TopAppBar (sino, engrenagem, apps), nav
-  Home/Analytics/Audit, avatar, clique no Stepper em passo **ainda não alcançado**.
+  Home/Analytics/Audit, avatar, botão "Cancelar" do Passo 1 (Validação), clique no Stepper em
+  passo **ainda não alcançado**.
 - **Stepper (B)**: navegação livre (sem log) para qualquer passo já alcançado, para frente ou
   para trás — só bloqueia (e loga) pular além do maior passo alcançado, pois passo 2 exige NF
   criada e passo 3 exige conferência concluída.
@@ -521,7 +522,12 @@ Login simples de participante — código + senha, cookie httpOnly (`lib/auth/`)
   `POST /api/eventos-erro`. Antes só `POST /api/sessoes` checava isso — as demais confiavam só
   na proteção de página do `proxy.ts`, o que não barra alguém chamando a API diretamente sem
   nunca ter passado pela UI. Hospedar publicamente (Vercel) tornou isso um risco real, não só
-  teórico, daí a rodada de correção em todas essas rotas de uma vez.
+  teórico, daí a rodada de correção em todas essas rotas de uma vez. `PATCH /api/sessoes/[id]`,
+  `POST /api/sessoes/[id]/abandonar` e `POST /api/eventos-erro` também checam **posse** — a
+  `SessaoTeste` referenciada precisa pertencer ao usuário autenticado, não só existir —, mesmo
+  padrão de `POST /api/sessoes/[id]/avaliacao` (ver "Avaliação Pós-Tarefa"): sem essa checagem,
+  uma requisição direta contornando a UI poderia finalizar, apagar ou injetar `EventoErro` na
+  sessão de outro participante a partir de um `sessaoId` adivinhado.
 - A home (`app/page.tsx`) não tem mais campo livre de "Código do Participante": ela checa
   `GET /api/auth/me` no mount e renderiza `LoginForm` (deslogado) ou `IniciarTarefaForm`
   (logado, com botão "sair").

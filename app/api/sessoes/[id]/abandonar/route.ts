@@ -8,11 +8,12 @@ import { obterUsuarioAutenticado } from "@/lib/auth/session";
 // sessão que terminou com sucesso um instante antes do beacon disparar.
 // sendBeacon é same-origin, então o cookie de sessão viaja normalmente junto.
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await obterUsuarioAutenticado())) {
+  const usuario = await obterUsuarioAutenticado();
+  if (!usuario) {
     return NextResponse.json({ erros: [{ campo: "geral", mensagem: "Não autenticado." }] }, { status: 401 });
   }
 
   const { id } = await params;
-  await prisma.sessaoTeste.deleteMany({ where: { id, timestampFim: null } });
+  await prisma.sessaoTeste.deleteMany({ where: { id, usuarioId: usuario.id, timestampFim: null } });
   return NextResponse.json({ ok: true });
 }

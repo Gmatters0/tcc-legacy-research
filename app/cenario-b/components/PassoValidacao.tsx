@@ -205,7 +205,11 @@ export function PassoValidacao({ form, onChangeForm, notaFiscalExistente, onConc
       </div>
 
       <div className="flex justify-end gap-3 border-t border-[#c3c6d7] bg-[#f3f3fe] px-4 py-4">
-        <button type="button" className="rounded-lg px-5 py-2 text-sm font-medium text-[#434655]">
+        <button
+          type="button"
+          onClick={() => registrarErro(TipoEventoErro.CLIQUE_FORA_FLUXO, "cenario-b/validacao.Cancelar")}
+          className="rounded-lg px-5 py-2 text-sm font-medium text-[#434655]"
+        >
           Cancelar
         </button>
         <button
