@@ -676,10 +676,17 @@ Rota `/admin`, login próprio e separado do login de participante (`lib/admin/`)
 - **Grid de sessões** (`SessoesGrid.tsx`) e **export** (`/api/admin/export`) compartilham a
   mesma fonte de dados — `buscarLinhasRelatorio()` (`lib/instrumentation/relatorio.ts`) — para
   a grid nunca divergir do que é exportado. Cada linha tem duração calculada
-  (`timestampFim - timestampInicio`) e contagem de `EventoErro` por `TipoEventoErro`. O export
-  aceita `?formato=csv|json` e `?usuarioId=` opcional (tudo vs. por participante), respondendo
-  com `Content-Disposition: attachment` para o navegador baixar direto ao clicar no link — sem
-  JS extra do lado do cliente.
+  (`timestampFim - timestampInicio`), contagem de `EventoErro` por `TipoEventoErro`, e os dados
+  da **Avaliação Pós-Tarefa** daquela sessão (NASA-TLX, os 10 itens do SUS + `susScore`, os 10
+  itens do questionário subjetivo) e da **Comparação Final** do `Usuario` dono da sessão
+  (preferência, porque, feedback — repetida nas duas sessões do mesmo usuário, já que é 1-para-1
+  com `Usuario`, não com `SessaoTeste`) — `null` enquanto a sessão não passou pela avaliação. Na
+  grid isso aparece como coluna de score SUS + botão "Ver detalhes" que expande uma linha com
+  os três instrumentos por extenso (rótulos de `lib/avaliacao-config.ts`) e a comparação final,
+  se houver; no export (CSV/JSON) viram colunas/campos adicionais, pensado pra análise estatística
+  direta sem precisar cruzar tabelas. O export aceita `?formato=csv|json` e `?usuarioId=`
+  opcional (tudo vs. por participante), respondendo com `Content-Disposition: attachment` para o
+  navegador baixar direto ao clicar no link — sem JS extra do lado do cliente.
 
 ## Testes Automatizados
 
@@ -789,9 +796,10 @@ export de assets).
   home ou seguir pra `/obrigado` (com desativação automática do `Usuario`) — ver seção
   "Avaliação Pós-Tarefa" e "Telas de Encerramento".
 - Painel administrativo (`/admin`, login próprio via `ADMIN_SENHA`): grid de sessões com
-  duração e erros por tipo, export CSV/JSON (tudo ou por participante), criação de `Usuario`
-  com código/senha gerados automaticamente, ativar/desativar manual — ver seção "Painel
-  Administrativo".
+  duração, erros por tipo, score SUS e detalhe expansível do NASA-TLX/SUS/subjetivo/Comparação
+  Final; export CSV/JSON (tudo ou por participante) com todas essas colunas; criação de
+  `Usuario` com código/senha gerados automaticamente, ativar/desativar manual — ver seção
+  "Painel Administrativo".
 - Persistência de navegação no Cenário B (estado dos 3 passos elevado, sem perder dados ao usar
   o Stepper para voltar) e aviso nativo de reload em ambos os cenários — ver seção
   "Persistência de Navegação e Aviso de Reload".

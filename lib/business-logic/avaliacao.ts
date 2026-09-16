@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { calcularSusScore, SUS_ITENS, SUBJETIVO_ITENS, TlxChave } from "@/lib/avaliacao-config";
+import { calcularSusScore, calcularTlxScore, SUS_ITENS, SUBJETIVO_ITENS, TlxChave } from "@/lib/avaliacao-config";
 import { BusinessLogicError, ErroCampo } from "./types";
 
 export interface AvaliacaoPosTarefaInput {
@@ -65,6 +65,7 @@ export async function registrarAvaliacao(sessaoId: string, input: AvaliacaoPosTa
         tlxDesempenho: input.tlx.desempenho,
         tlxEsforco: input.tlx.esforco,
         tlxFrustracao: input.tlx.frustracao,
+        tlxScore: calcularTlxScore(input.tlx),
         susQ1: input.sus[0],
         susQ2: input.sus[1],
         susQ3: input.sus[2],

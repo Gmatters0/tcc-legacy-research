@@ -103,3 +103,14 @@ export function calcularSusScore(respostas: number[]): number {
   const soma = respostas.reduce((acc, valor, indice) => acc + (indice % 2 === 0 ? valor - 1 : 5 - valor), 0);
   return soma * 2.5;
 }
+
+// Raw TLX (RTLX, Hart 2006): média simples das 6 dimensões, sem ponderação
+// por pares — a diferença para o TLX completo é só essa (não muda a escala
+// nem exige inverter nenhuma dimensão). "Desempenho" já é rotulada Bom→Ruim
+// (não Ruim→Bom) especificamente pra ficar na mesma direção das outras 5
+// (0 = melhor experiência, 100 = pior) — por isso a média direta já é
+// semanticamente correta, sem tratamento especial.
+export function calcularTlxScore(respostas: Record<TlxChave, number>): number {
+  const valores = Object.values(respostas);
+  return valores.reduce((soma, valor) => soma + valor, 0) / valores.length;
+}
