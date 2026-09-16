@@ -200,7 +200,9 @@ export function PassoBaixa({ notaFiscal, quantidadeSugerida, form, onChangeForm,
             <div className="flex justify-between">
               <span className="text-[#434655]">Data Emissão:</span>
               <span className="font-semibold text-[#191b23]">
-                {new Date(notaFiscal.dataEmissao).toLocaleDateString("pt-BR")}
+                {/* timeZone: "UTC" pois dataEmissao é uma data de calendário (@db.Date), não um
+                    instante — sem isso, o fuso do navegador de quem vê podia exibir o dia errado. */}
+                {new Date(notaFiscal.dataEmissao).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
               </span>
             </div>
             <div className="flex justify-between">

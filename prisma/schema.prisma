@@ -20,7 +20,7 @@ model Usuario {
   codigo          String           @unique
   senhaHash       String
   ativo           Boolean          @default(true)
-  createdAt       DateTime         @default(now())
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
   sessoes         SessaoTeste[]
   comparacaoFinal ComparacaoFinal?
 }
@@ -29,9 +29,13 @@ model NotaFiscal {
   id                 String              @id @default(cuid())
   numero             String
   fornecedor         String
-  dataEmissao        DateTime
+  // Data do documento fiscal, não um instante — @db.Date evita que o
+  // fuso horário de quem grava ou de quem lê desloque o dia (ver histórico
+  // de bug: timestamp sem tz + toLocaleDateString sem timeZone explícito
+  // faziam a data exibida "andar" um dia dependendo do fuso do navegador).
+  dataEmissao        DateTime            @db.Date
   valorTotal         Float
-  createdAt          DateTime            @default(now())
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
   itensRecebidos     ItemRecebido[]
   lancamentosEstoque LancamentoEstoque[]
 }
@@ -55,7 +59,7 @@ model LancamentoEstoque {
   status       String
   notaFiscalId String
   notaFiscal   NotaFiscal @relation(fields: [notaFiscalId], references: [id])
-  createdAt    DateTime   @default(now())
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
 }
 
 model SessaoTeste {
@@ -65,8 +69,8 @@ model SessaoTeste {
   perfilUsuario   PerfilUsuario
   cenario         String
   conjuntoTarefa  String
-  timestampInicio DateTime
-  timestampFim    DateTime?
+  timestampInicio DateTime            @db.Timestamptz(3)
+  timestampFim    DateTime?           @db.Timestamptz(3)
   eventosErro     EventoErro[]
   avaliacao       AvaliacaoPosTarefa?
 }
@@ -76,7 +80,7 @@ model EventoErro {
   sessaoId  String
   sessao    SessaoTeste @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
   tipo      String
-  timestamp DateTime    @default(now())
+  timestamp DateTime    @default(now()) @db.Timestamptz(3)
   detalhe   String?
 }
 
@@ -115,7 +119,7 @@ model AvaliacaoPosTarefa {
   subjQ8        Int
   subjQ9        Int
   subjQ10       Int
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime    @default(now()) @db.Timestamptz(3)
 }
 
 // Aplicada uma única vez por Usuario, depois que os dois cenários já foram
@@ -127,5 +131,5 @@ model ComparacaoFinal {
   preferencia String
   porque      String
   feedback    String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
 }

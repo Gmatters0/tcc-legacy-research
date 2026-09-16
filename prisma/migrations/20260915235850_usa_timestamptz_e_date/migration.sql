@@ -1,0 +1,22 @@
+-- AlterTable
+ALTER TABLE "AvaliacaoPosTarefa" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "ComparacaoFinal" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "EventoErro" ALTER COLUMN "timestamp" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "LancamentoEstoque" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "NotaFiscal" ALTER COLUMN "dataEmissao" SET DATA TYPE DATE,
+ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "SessaoTeste" ALTER COLUMN "timestampInicio" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "timestampFim" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "Usuario" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
