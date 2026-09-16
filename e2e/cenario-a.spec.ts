@@ -6,7 +6,7 @@ async function entrarNoCenarioA(page: import("@playwright/test").Page, rotulo: s
   const usuario = await criarUsuarioTeste(rotulo);
   await login(page, usuario.codigo, usuario.senha);
   await iniciarTarefa(page, { perfil: "TECNICO", cenario: "A", conjunto: "conjunto-1" });
-  await expect(page.getByText("Entrada de Nota Fiscal")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Entrada de Nota Fiscal" })).toBeVisible();
   return usuario;
 }
 
