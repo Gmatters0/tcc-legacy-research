@@ -1,19 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { SessoesGrid } from "./components/SessoesGrid";
 import { UsuariosPainel } from "./components/UsuariosPainel";
-import type { LinhaRelatorioAdmin } from "./types";
 
 export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
-  const [linhas, setLinhas] = useState<LinhaRelatorioAdmin[] | null>(null);
   const [saindo, setSaindo] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/admin/sessoes")
-      .then((response) => (response.ok ? response.json() : []))
-      .then(setLinhas);
-  }, []);
 
   async function handleLogout() {
     setSaindo(true);
@@ -39,7 +31,7 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       </div>
 
       <UsuariosPainel />
-      <SessoesGrid linhas={linhas ?? []} />
+      <SessoesGrid />
     </div>
   );
 }

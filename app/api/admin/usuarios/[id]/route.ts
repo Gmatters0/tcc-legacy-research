@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { estaAutenticadoComoAdmin } from "@/lib/admin/session";
-import { desativarUsuario, reativarUsuario } from "@/lib/auth/usuario";
+import { apagarUsuario, desativarUsuario, reativarUsuario } from "@/lib/auth/usuario";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await estaAutenticadoComoAdmin())) {
@@ -21,6 +21,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   } else {
     await desativarUsuario(id);
   }
+
+  return NextResponse.json({ ok: true });
+}
+
+// Exclusão definitiva do Usuario e de todas as suas SessaoTeste (com
+// EventoErro/AvaliacaoPosTarefa em cascata) e ComparacaoFinal — diferente do
+// PATCH acima, que só desativa/reativa. Sem confirmação adicional aqui: a
+// confirmação é responsabilidade da UI (modal), a API só executa.
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await estaAutenticadoComoAdmin())) {
+    return NextResponse.json({ erros: [{ campo: "geral", mensagem: "Não autenticado." }] }, { status: 401 });
+  }
+
+  const { id } = await params;
+  await apagarUsuario(id);
 
   return NextResponse.json({ ok: true });
 }

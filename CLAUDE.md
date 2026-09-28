@@ -135,17 +135,24 @@ mudou:
                                        antes de chegar aqui)
   /admin                            → painel administrativo (ver seção "Painel Administrativo")
     page.tsx                        → gate de login próprio (AdminLoginForm) → AdminDashboard
-    AdminDashboard.tsx              → orquestrador: busca sessões, botão "sair"
-    /components                     → AdminLoginForm, SessoesGrid, UsuariosPainel
+    AdminDashboard.tsx              → orquestrador: só o cabeçalho e o botão "sair" — sessões e
+                                       usuários são buscados e recarregados pelos próprios
+                                       SessoesGrid/UsuariosPainel (cada um cuida do seu fetch)
+    /components                     → AdminLoginForm, SessoesGrid, UsuariosPainel, ConfirmModal
+                                       (modal de confirmação genérico, reusado pelas 3 exclusões
+                                       abaixo — ver "Painel Administrativo")
   /api
     /admin
       login/route.ts                → POST valida ADMIN_SENHA e grava cookie httpOnly próprio
       logout/route.ts                → POST apaga o cookie de admin
       me/route.ts                    → GET 200/401 conforme sessão de admin válida
-      sessoes/route.ts               → GET todas as linhas de relatório (grid)
+      sessoes/route.ts               → GET todas as linhas de relatório (grid); DELETE apaga
+                                       TODAS as SessaoTeste de uma vez
+      sessoes/[id]/route.ts          → DELETE apaga uma única SessaoTeste
       export/route.ts                → GET ?formato=csv|json&usuarioId= (opcional) — download
       usuarios/route.ts               → GET lista usuários + histórico; POST cria usuário
-      usuarios/[id]/route.ts          → PATCH ativa/desativa usuário
+      usuarios/[id]/route.ts          → PATCH ativa/desativa usuário; DELETE apaga o Usuario
+                                       permanentemente
     /auth
       login/route.ts                → POST autentica e grava cookie httpOnly de sessão
       logout/route.ts                → POST apaga o cookie de sessão
@@ -272,7 +279,7 @@ model Usuario {
   codigo          String           @unique // ex: "PJS-01" — NUNCA o nome real
   senhaHash       String
   ativo           Boolean          @default(true)
-  createdAt       DateTime         @default(now())
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
   sessoes         SessaoTeste[]
   comparacaoFinal ComparacaoFinal?
 }
@@ -281,9 +288,12 @@ model NotaFiscal {
   id                 String   @id @default(cuid())
   numero             String
   fornecedor         String
-  dataEmissao        DateTime
+  // Data do documento fiscal, não um instante — @db.Date evita que o fuso
+  // horário de quem grava ou de quem lê desloque o dia (ver "Regras de
+  // Negócio" abaixo — bug real descoberto num piloto simulado).
+  dataEmissao        DateTime            @db.Date
   valorTotal         Float
-  createdAt          DateTime @default(now())
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
   itensRecebidos     ItemRecebido[]
   lancamentosEstoque LancamentoEstoque[]
 }
@@ -307,7 +317,7 @@ model LancamentoEstoque {
   status       String    // "CONCLUIDO" | "CONCLUIDO_COM_DIVERGENCIA"
   notaFiscalId String
   notaFiscal   NotaFiscal @relation(fields: [notaFiscalId], references: [id])
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model SessaoTeste {
@@ -317,8 +327,8 @@ model SessaoTeste {
   perfilUsuario   PerfilUsuario
   cenario         String              // "A" | "B"
   conjuntoTarefa  String
-  timestampInicio DateTime
-  timestampFim    DateTime?
+  timestampInicio DateTime            @db.Timestamptz(3)
+  timestampFim    DateTime?           @db.Timestamptz(3)
   eventosErro     EventoErro[]
   avaliacao       AvaliacaoPosTarefa?
 }
@@ -336,6 +346,7 @@ model AvaliacaoPosTarefa {
   tlxDesempenho Float
   tlxEsforco    Float
   tlxFrustracao Float
+  tlxScore      Float       // calculado no servidor, média simples das 6 dimensões (Raw TLX)
   susQ1         Int
   susQ2         Int
   susQ3         Int
@@ -357,7 +368,7 @@ model AvaliacaoPosTarefa {
   subjQ8        Int
   subjQ9        Int
   subjQ10       Int
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime    @default(now()) @db.Timestamptz(3)
 }
 
 // Uma única vez por Usuario, depois que os dois cenários já foram concluídos e avaliados.
@@ -368,7 +379,7 @@ model ComparacaoFinal {
   preferencia String   // "A" | "B"
   porque      String
   feedback    String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model EventoErro {
@@ -376,7 +387,7 @@ model EventoErro {
   sessaoId  String
   sessao    SessaoTeste @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
   tipo      String
-  timestamp DateTime    @default(now())
+  timestamp DateTime    @default(now()) @db.Timestamptz(3)
   detalhe   String?
 }
 ```
@@ -419,6 +430,17 @@ zero" (`ERRO_VALIDACAO_CAMPO`) chega intacta na API.
 
 **Divergência**: `qtdRecebida - qtdPedida ≠ 0` por item → nota divergente →
 `LancamentoEstoque.status = "CONCLUIDO_COM_DIVERGENCIA"`; caso contrário, `"CONCLUIDO"`.
+
+**`dataEmissao` e fuso horário**: `NotaFiscal.dataEmissao` é `@db.Date` no schema (data pura de
+calendário, sem hora nem timezone) — não `DateTime`/timestamp como os demais campos de data.
+Bug real descoberto num piloto simulado: um timestamp sem timezone "anda" de dia dependendo do
+fuso de quem grava e de quem lê (ex: servidor em UTC na Vercel vs. navegador em
+America/Sao_Paulo), então uma data digitada como 12/03 podia aparecer como 11/03 no resumo antes
+de salvar a baixa (`PassoBaixa.tsx`, Cenário B). `@db.Date` resolve na raiz; exibições que ainda
+usam `toLocaleDateString` (ex: `PassoBaixa.tsx`) forçam `timeZone: "UTC"` para não reintroduzir o
+mesmo problema na camada de exibição. Os demais campos de instante real (`createdAt`,
+`timestampInicio`/`timestampFim`, `EventoErro.timestamp`) usam `@db.Timestamptz(3)` — são
+instantes de verdade, não datas de calendário, então precisam do timezone.
 
 ## Instrumentação de Métricas
 
@@ -610,7 +632,11 @@ sequenciais, sempre na mesma ordem:
    registrado como tal em `lib/avaliacao-config.ts` e deve constar assim na metodologia do TCC.
    Cada slider começa em 50 mas só conta como respondido depois que o participante efetivamente
    arrasta (`tlxTocado` por dimensão) — evita viés do valor default nunca ter sido escolhido de
-   propósito.
+   propósito. Score final (`tlxScore`) calculado no servidor (`calcularTlxScore` em
+   `lib/avaliacao-config.ts`): média simples das 6 dimensões (Raw TLX/RTLX, sem ponderação por
+   pares — mesma decisão do item completo). "Desempenho" é rotulada Bom→Ruim (não o contrário)
+   especificamente para ficar na mesma direção das outras 5 dimensões (0 = melhor experiência,
+   100 = pior), então a média direta já é semanticamente correta sem inverter nada.
 2. **SUS** (`PassoLikert.tsx`, reaproveitado) — 10 itens, Likert 1-5. **Tradução e adaptação
    transcultural validada para português do Brasil**: Lourenço, D. F., Carmona, E. V., & Lopes,
    M. H. B. M. (2022). *Translation and Cross-Cultural Adaptation of the System Usability Scale
@@ -677,16 +703,39 @@ Rota `/admin`, login próprio e separado do login de participante (`lib/admin/`)
   mesma fonte de dados — `buscarLinhasRelatorio()` (`lib/instrumentation/relatorio.ts`) — para
   a grid nunca divergir do que é exportado. Cada linha tem duração calculada
   (`timestampFim - timestampInicio`), contagem de `EventoErro` por `TipoEventoErro`, e os dados
-  da **Avaliação Pós-Tarefa** daquela sessão (NASA-TLX, os 10 itens do SUS + `susScore`, os 10
-  itens do questionário subjetivo) e da **Comparação Final** do `Usuario` dono da sessão
-  (preferência, porque, feedback — repetida nas duas sessões do mesmo usuário, já que é 1-para-1
-  com `Usuario`, não com `SessaoTeste`) — `null` enquanto a sessão não passou pela avaliação. Na
-  grid isso aparece como coluna de score SUS + botão "Ver detalhes" que expande uma linha com
-  os três instrumentos por extenso (rótulos de `lib/avaliacao-config.ts`) e a comparação final,
-  se houver; no export (CSV/JSON) viram colunas/campos adicionais, pensado pra análise estatística
-  direta sem precisar cruzar tabelas. O export aceita `?formato=csv|json` e `?usuarioId=`
-  opcional (tudo vs. por participante), respondendo com `Content-Disposition: attachment` para o
-  navegador baixar direto ao clicar no link — sem JS extra do lado do cliente.
+  da **Avaliação Pós-Tarefa** daquela sessão (NASA-TLX + `tlxScore`, os 10 itens do SUS +
+  `susScore`, os 10 itens do questionário subjetivo) e da **Comparação Final** do `Usuario` dono
+  da sessão (preferência, porque, feedback — repetida nas duas sessões do mesmo usuário, já que
+  é 1-para-1 com `Usuario`, não com `SessaoTeste`) — `null` enquanto a sessão não passou pela
+  avaliação. Na grid isso aparece como colunas de score NASA-TLX e SUS + botão "Ver detalhes"
+  que expande uma linha com os três instrumentos por extenso (rótulos de
+  `lib/avaliacao-config.ts`) e a comparação final, se houver; no export (CSV/JSON) viram
+  colunas/campos adicionais, pensado pra análise estatística direta sem precisar cruzar
+  tabelas. O export aceita `?formato=csv|json` e `?usuarioId=` opcional (tudo vs. por
+  participante), respondendo com `Content-Disposition: attachment` para o navegador baixar
+  direto ao clicar no link — sem JS extra do lado do cliente.
+- **Limpeza de dados** (`ConfirmModal.tsx`, reusado nas três ações abaixo): todo botão
+  destrutivo do painel abre um modal de confirmação (`role="dialog"`) antes de executar —
+  nenhuma exclusão acontece só com o clique inicial.
+  - `SessoesGrid.tsx` — "Excluir" por linha (`DELETE /api/admin/sessoes/[id]`) apaga uma única
+    `SessaoTeste` (com `EventoErro`/`AvaliacaoPosTarefa` em cascata); "Excluir todas" no
+    cabeçalho da grid (`DELETE /api/admin/sessoes`) apaga **todas** as `SessaoTeste` de uma vez
+    — não toca em `Usuario` nem `ComparacaoFinal`, escopo é só "registros de sessão". Ambas
+    recarregam a grid ao confirmar (`SessoesGrid` busca seus próprios dados agora, em vez de
+    receber `linhas` como prop do `AdminDashboard` — mesmo padrão que `UsuariosPainel` já
+    usava).
+  - `UsuariosPainel.tsx` — "Excluir" por linha (`DELETE /api/admin/usuarios/[id]` →
+    `apagarUsuario()` em `lib/auth/usuario.ts`) apaga o `Usuario` **permanentemente**, diferente
+    de "Desativar" (que só bloqueia login, reversível via "Reativar"). Como `SessaoTeste.usuario`
+    não tem `onDelete: Cascade` (ao contrário de `ComparacaoFinal.usuario`), `apagarUsuario()`
+    apaga as `SessaoTeste` do usuário numa transação antes de apagar o `Usuario` — mesmo
+    raciocínio de `scripts/reset-db.js`.
+  - **"Excluir todas" as sessões não é coberto pelos smoke tests E2E** de propósito: o endpoint
+    apaga toda a tabela `SessaoTeste` no banco que o `DATABASE_URL` apontar — rodar isso num
+    teste automatizado arriscaria apagar dado real caso a suíte alguma vez rodasse contra um
+    banco com dado de verdade. As exclusões individuais (sessão e usuário) são cobertas em
+    `e2e/admin.spec.ts`, com o modal de confirmação testado nos dois sentidos (cancelar mantém,
+    confirmar remove).
 
 ## Testes Automatizados
 
@@ -744,7 +793,8 @@ dev`, subido automaticamente pelo `webServer` do Playwright) conectado ao **Post
   incompletos) e segurança no servidor da avaliação — posse da sessão, sessão ainda não
   finalizada (`avaliacao-pos-tarefa.spec.ts`); painel administrativo — login, criação de
   usuário (formato do código, ausência de caracteres ambíguos na senha), toggle
-  ativar/desativar (`admin.spec.ts`).
+  ativar/desativar, exclusão de usuário e de sessão individual com o modal de confirmação
+  testado nos dois sentidos — cancelar mantém, confirmar remove (`admin.spec.ts`).
 - **`ADMIN_SENHA` lido de `process.env`** (via `dotenv/config` em `playwright.config.ts`) —
   nunca hardcoded no arquivo de teste, é o mesmo segredo real do `.env`.
 - **Depois de rodar**, `pnpm run db:reset -- --yes` como rede de segurança extra antes de
@@ -776,7 +826,7 @@ export de assets).
 - Scaffold completo (Next.js + TS + Tailwind v4 + Prisma 7/PostgreSQL + pnpm).
 - Migração de SQLite local para Postgres hospedado (Prisma Postgres) — ver "Migração SQLite →
   Postgres".
-- Schema de dados completo (7 models + enum), migrations aplicadas.
+- Schema de dados completo (8 models + enum), migrations aplicadas.
 - Camada de lógica de negócio compartilhada (`lib/business-logic`) com todas as regras de
   validação da seção acima.
 - API compartilhada completa (`/api/notas-fiscais`, `/api/sessoes`, `/api/eventos-erro` e
@@ -796,10 +846,11 @@ export de assets).
   home ou seguir pra `/obrigado` (com desativação automática do `Usuario`) — ver seção
   "Avaliação Pós-Tarefa" e "Telas de Encerramento".
 - Painel administrativo (`/admin`, login próprio via `ADMIN_SENHA`): grid de sessões com
-  duração, erros por tipo, score SUS e detalhe expansível do NASA-TLX/SUS/subjetivo/Comparação
-  Final; export CSV/JSON (tudo ou por participante) com todas essas colunas; criação de
-  `Usuario` com código/senha gerados automaticamente, ativar/desativar manual — ver seção
-  "Painel Administrativo".
+  duração, erros por tipo, score NASA-TLX e SUS e detalhe expansível do
+  NASA-TLX/SUS/subjetivo/Comparação Final; export CSV/JSON (tudo ou por participante) com todas
+  essas colunas; criação de `Usuario` com código/senha gerados automaticamente,
+  ativar/desativar manual; exclusão de sessão (individual ou em massa) e exclusão permanente de
+  `Usuario`, todas atrás de modal de confirmação — ver seção "Painel Administrativo".
 - Persistência de navegação no Cenário B (estado dos 3 passos elevado, sem perder dados ao usar
   o Stepper para voltar) e aviso nativo de reload em ambos os cenários — ver seção
   "Persistência de Navegação e Aviso de Reload".
@@ -815,12 +866,13 @@ export de assets).
   real.
 - Verificação funcional completa (type-check, lint e fluxo ponta a ponta) rodada ao vivo em
   ambos os cenários após cada rodada de mudanças.
-- Testes automatizados unitários (Vitest, 62 testes) das camadas `business-logic`,
+- Testes automatizados unitários (Vitest, 68 testes) das camadas `business-logic`,
   `instrumentation` e `auth` — ver seção "Testes Automatizados".
-- Smoke tests E2E (Playwright): 32 testes cobrindo login/proteção de rota, fluxo de sucesso e
+- Smoke tests E2E (Playwright): 34 testes cobrindo login/proteção de rota, fluxo de sucesso e
   os 4 tipos de `EventoErro` em cada cenário, regra de não-repetição, o fluxo completo de
-  Avaliação Pós-Tarefa + Comparação Final + encerramento, e painel administrativo — todos
-  passando contra o Postgres real. Ver seção "Testes Automatizados".
+  Avaliação Pós-Tarefa + Comparação Final + encerramento, e painel administrativo (incluindo as
+  exclusões de sessão/usuário com confirmação) — todos passando contra o Postgres real. Ver
+  seção "Testes Automatizados".
 
 ## O que ainda falta implementar (fora de escopo até agora)
 

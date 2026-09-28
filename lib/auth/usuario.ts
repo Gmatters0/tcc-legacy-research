@@ -34,6 +34,20 @@ export async function reativarUsuario(id: string): Promise<void> {
   await prisma.usuario.update({ where: { id }, data: { ativo: true } });
 }
 
+// Exclusão definitiva (diferente de desativarUsuario, que só bloqueia login) —
+// usada só pelo painel admin, nunca pelo fluxo do participante. SessaoTeste
+// não tem onDelete: Cascade na FK para Usuario (ao contrário de
+// ComparacaoFinal), então precisa ser apagada explicitamente antes, na mesma
+// transação — mesmo raciocínio de scripts/reset-db.js. Apagar SessaoTeste já
+// cascateia EventoErro e AvaliacaoPosTarefa; apagar Usuario já cascateia
+// ComparacaoFinal.
+export async function apagarUsuario(id: string): Promise<void> {
+  await prisma.$transaction([
+    prisma.sessaoTeste.deleteMany({ where: { usuarioId: id } }),
+    prisma.usuario.deleteMany({ where: { id } }),
+  ]);
+}
+
 export async function listarUsuarios(): Promise<(UsuarioPublico & { ativo: boolean; createdAt: Date })[]> {
   const usuarios = await prisma.usuario.findMany({ orderBy: { createdAt: "desc" } });
   return usuarios.map((u) => ({ id: u.id, codigo: u.codigo, ativo: u.ativo, createdAt: u.createdAt }));

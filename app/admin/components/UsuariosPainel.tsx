@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import type { UsuarioAdmin } from "../types";
+import { ConfirmModal } from "./ConfirmModal";
 
 export function UsuariosPainel() {
   const [usuarios, setUsuarios] = useState<UsuarioAdmin[] | null>(null);
@@ -9,6 +10,8 @@ export function UsuariosPainel() {
   const [criando, setCriando] = useState(false);
   const [erroCriacao, setErroCriacao] = useState<string | null>(null);
   const [usuarioCriado, setUsuarioCriado] = useState<{ codigo: string; senha: string } | null>(null);
+  const [usuarioParaExcluir, setUsuarioParaExcluir] = useState<UsuarioAdmin | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
 
   async function carregarUsuarios() {
     const response = await fetch("/api/admin/usuarios");
@@ -51,6 +54,18 @@ export function UsuariosPainel() {
       body: JSON.stringify({ ativo: !usuario.ativo }),
     });
     await carregarUsuarios();
+  }
+
+  async function confirmarExclusao() {
+    if (!usuarioParaExcluir) return;
+    setExcluindo(true);
+    try {
+      await fetch(`/api/admin/usuarios/${usuarioParaExcluir.id}`, { method: "DELETE" });
+      setUsuarioParaExcluir(null);
+      await carregarUsuarios();
+    } finally {
+      setExcluindo(false);
+    }
   }
 
   return (
@@ -155,6 +170,13 @@ export function UsuariosPainel() {
                     >
                       {usuario.ativo ? "Desativar" : "Reativar"}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setUsuarioParaExcluir(usuario)}
+                      className="font-medium text-red-600 underline underline-offset-2"
+                    >
+                      Excluir
+                    </button>
                     <a
                       href={`/api/admin/export?formato=csv&usuarioId=${usuario.id}`}
                       className="font-medium text-zinc-700 underline underline-offset-2"
@@ -174,6 +196,16 @@ export function UsuariosPainel() {
           </tbody>
         </table>
       </div>
+
+      {usuarioParaExcluir && (
+        <ConfirmModal
+          titulo="Excluir este usuário?"
+          descricao={`O usuário ${usuarioParaExcluir.codigo}, todas as suas sessões, eventos de erro, avaliações pós-tarefa e a comparação final serão apagados permanentemente. Essa ação não pode ser desfeita.`}
+          confirmando={excluindo}
+          onConfirmar={confirmarExclusao}
+          onCancelar={() => setUsuarioParaExcluir(null)}
+        />
+      )}
     </section>
   );
 }
