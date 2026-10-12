@@ -94,13 +94,6 @@ export function TopNavBar({ onSalvar }: { onSalvar: () => void }) {
             <HelpCircle className="h-3 w-3 text-[#1b1c1c]" />
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => handleElementoDecorativo("toolbar.Execute")}
-          className="border border-white bg-[#d2d2d2] px-3 py-1 text-[11px] text-[#1b1c1c] hover:bg-[#c2c7d0]"
-        >
-          Execute
-        </button>
       </div>
     </header>
   );

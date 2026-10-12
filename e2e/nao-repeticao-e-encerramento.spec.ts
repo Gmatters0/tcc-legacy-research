@@ -17,6 +17,11 @@ test.describe("Regra de não-repetição", () => {
     await expect(page).toHaveURL("/", { timeout: 15_000 });
     await expect(page.getByText(/^Logado como/)).toBeVisible();
 
+    // O perfil informado no primeiro cenário vem selecionado e travado.
+    const selectPerfil = page.locator("select").nth(0);
+    await expect(selectPerfil).toBeDisabled();
+    await expect(selectPerfil).toHaveValue("TECNICO");
+
     // Só sobrou Cenário B e Conjunto 2 — os dois <select> vêm travados.
     const selectCenario = page.locator("select").nth(1);
     const selectConjunto = page.locator("select").nth(2);

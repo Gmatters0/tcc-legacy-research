@@ -14,6 +14,7 @@ import { FieldsetBaixa } from "./components/FieldsetBaixa";
 import { ErrorReviewModal } from "./components/ErrorReviewModal";
 import { DepositoModal } from "./components/DepositoModal";
 import type { ErroApi, ItemConferenciaA } from "./types";
+import { paraValorMonetario } from "./valor";
 
 function paraIso(dataPontuada: string): string {
   const partes = dataPontuada.split(".").map((parte) => parte.trim());
@@ -125,7 +126,7 @@ function CenarioAConteudo() {
           numero,
           fornecedor,
           dataEmissao: paraIso(dataEmissao),
-          valorTotal: paraQuantidade(valorTotal.replace(",", ".")),
+          valorTotal: paraValorMonetario(valorTotal),
         }),
       });
       const dadosNota = await respostaNota.json();

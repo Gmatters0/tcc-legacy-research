@@ -12,11 +12,12 @@ export async function iniciarTarefa(
   opts: { perfil: "TECNICO" | "NAO_TECNICO"; cenario: "A" | "B"; conjunto: "conjunto-1" | "conjunto-2" },
 ) {
   await page.getByText(/^Logado como/).waitFor();
-  await page.locator("select").nth(0).selectOption(opts.perfil);
+  const selectPerfil = page.locator("select").nth(0);
   const selectCenario = page.locator("select").nth(1);
   const selectConjunto = page.locator("select").nth(2);
-  // Selects já podem vir travados (regra de não-repetição) — só seleciona
-  // manualmente se ainda estiverem habilitados.
+  // Selects já podem vir travados (perfil do primeiro cenário, regra de
+  // não-repetição) — só seleciona manualmente se ainda estiverem habilitados.
+  if (await selectPerfil.isEnabled()) await selectPerfil.selectOption(opts.perfil);
   if (await selectCenario.isEnabled()) await selectCenario.selectOption(opts.cenario);
   if (await selectConjunto.isEnabled()) await selectConjunto.selectOption(opts.conjunto);
   await page.getByRole("button", { name: "Iniciar Tarefa" }).click();

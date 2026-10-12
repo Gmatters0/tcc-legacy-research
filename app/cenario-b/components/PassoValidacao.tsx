@@ -6,16 +6,8 @@ import { useSessao } from "@/lib/instrumentation/SessaoProvider";
 import { classificarTipoErroPorMensagem } from "@/lib/instrumentation/erros";
 import { fornecedorPareceNumeroNota } from "@/lib/instrumentation/heuristica";
 import { TipoEventoErro } from "@/lib/instrumentation/types";
+import { aplicarMascaraMoeda } from "@/lib/mascaras";
 import type { FormValidacao, NotaFiscalResumo } from "../types";
-
-// Digita só dígitos, formata como centavos (padrão de máscara monetária BR) —
-// evita separador errado ou texto não numérico chegar no submit.
-function aplicarMascaraMoeda(valorDigitado: string): string {
-  const digitos = valorDigitado.replace(/\D/g, "");
-  if (!digitos) return "";
-  const numero = Number(digitos) / 100;
-  return numero.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 // Desfaz a máscara (remove separador de milhar, troca vírgula decimal por
 // ponto) antes de converter pra number.

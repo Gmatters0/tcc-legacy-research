@@ -19,9 +19,9 @@ export async function completarCenarioA(page: Page, numero: string) {
   await itemInputs.nth(4).fill("10");
   await itemInputs.nth(5).fill("UN");
 
-  const baixaInputs = fieldsetA(page, "Baixa em Estoque").locator("input");
-  await baixaInputs.nth(0).fill("D01");
-  await baixaInputs.nth(1).fill("Lote Teste E2E");
+  const baixa = fieldsetA(page, "Baixa em Estoque");
+  await baixa.locator("select").selectOption("D01");
+  await baixa.locator("input").fill("Lote Teste E2E");
 
   await page.getByTitle("Salvar").click();
 }

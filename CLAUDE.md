@@ -191,6 +191,8 @@ mudou:
                                        ARMAZENS_DISPONIVEIS (compartilhado entre A e B)
   avaliacao-config.ts               → conteúdo da Avaliação Pós-Tarefa: SUS_ITENS,
                                        SUBJETIVO_ITENS, TLX_ITENS, calcularSusScore()
+  mascaras.ts                       → aplicarMascaraMoeda()/aplicarMascaraData() — máscaras de
+                                       entrada compartilhadas (ver "Regras de Negócio")
   api-response.ts                   → helper de resposta de erro estruturado da API
   /auth                             → autenticação de participante (ver seção "Autenticação")
     constants.ts                    → SESSAO_COOKIE_NAME (compartilhado entre session.ts e proxy.ts)
@@ -428,6 +430,30 @@ estado da UI até o submit, convertidas para `undefined` se vazias (nunca coagid
 assim a distinção entre "campo vazio" (`INPUT_OBRIGATORIO_VAZIO`) e "campo preenchido com
 zero" (`ERRO_VALIDACAO_CAMPO`) chega intacta na API.
 
+**Máscaras de entrada** (`lib/mascaras.ts`, UI apenas — a API sempre recebe número/ISO):
+- **Valor Total** (A e B): `aplicarMascaraMoeda` — só dígitos, formatados como centavos com
+  ponto de milhar e vírgula decimal (`123456` → `1.234,56`); o usuário não digita separador.
+  No Cenário A o campo era texto livre e só trocava a primeira vírgula por ponto, então
+  `1.234,56` virava texto não numérico e era recusado — agora tem a mesma máscara do B, e
+  `paraValorMonetario()` (`app/cenario-a/valor.ts`) converte o texto para número antes de enviar
+  (também tolera `1234,56`, `R$ 1.234,56` e `1234.56`; ponto sem vírgula só vale como milhar em
+  grupos de 3 dígitos).
+- **Data Emissão** (A): `aplicarMascaraData` — `DD.MM.AAAA` com os pontos inseridos sozinhos. No
+  B é o `<input type="date">` nativo.
+
+**Dep. Destino no Cenário A** é um `<select>` nativo (código + nome, `w-64`) com os mesmos 3
+depósitos de `ARMAZENS_DISPONIVEIS`: não aceita texto arbitrário e digitar com o campo focado
+seleciona a opção correspondente (type-ahead); a lupa + `DepositoModal` continuam. O valor
+guardado segue sendo só o código (`D01`). Antes era texto livre, o que permitia gravar
+qualquer coisa. Efeito na heurística `ERRO_LOGICO_CADASTRO` de A: não dá mais para pôr o lote
+no depósito; o sinal que resta é depósito **sem selecionar** + código com cara de armazém no
+Lote (`pareceCampoTrocado("", "D01")`).
+
+**Perfil no segundo cenário**: `buscarHistoricoParticipacao()` também devolve `perfilUsuario`
+(da sessão concluída mais recente, `null` se não há) e `IniciarTarefaForm` o pré-seleciona e
+trava, igual cenário/conjunto — o perfil é da pessoa, não do cenário. Só checagem de UI: o
+servidor (`POST /api/sessoes`) não impede mandar outro perfil por chamada direta.
+
 **Divergência**: `qtdRecebida - qtdPedida ≠ 0` por item → nota divergente →
 `LancamentoEstoque.status = "CONCLUIDO_COM_DIVERGENCIA"`; caso contrário, `"CONCLUIDO"`.
 
@@ -461,7 +487,9 @@ instantes de verdade, não datas de calendário, então precisam do timezone.
 ordem. Todo elemento decorativo tem handler (`registrarErro('CLIQUE_FORA_FLUXO', 'elemento:
 <id>')`), sem executar nenhuma outra ação — nenhum clique morto.
 - **Cenário A**: itens do menu (Menu/Edit/Favorites/Extras/System/Help), ícones da toolbar
-  (busca+seta do ENT_NF, Imprimir, Voltar, Topo, Ajuda, Execute), teclas de função do rodapé
+  (busca+seta do ENT_NF, Imprimir, Voltar, Topo, Ajuda — o botão "Execute" foi **removido**: os
+  participantes o confundiam com "Salvar", virando isca em vez de medir clique errado
+  espontâneo), teclas de função do rodapé
   (F3/F5/F7/F12 — **F2 é funcional**, aciona o salvamento real), botão "Pesquisar" da
   Conferência.
 - **Cenário B**: itens do SideNavBar, ícones do TopAppBar (sino, engrenagem, apps), nav
@@ -866,9 +894,9 @@ export de assets).
   real.
 - Verificação funcional completa (type-check, lint e fluxo ponta a ponta) rodada ao vivo em
   ambos os cenários após cada rodada de mudanças.
-- Testes automatizados unitários (Vitest, 68 testes) das camadas `business-logic`,
+- Testes automatizados unitários (Vitest, 80 testes) das camadas `business-logic`,
   `instrumentation` e `auth` — ver seção "Testes Automatizados".
-- Smoke tests E2E (Playwright): 34 testes cobrindo login/proteção de rota, fluxo de sucesso e
+- Smoke tests E2E (Playwright): 36 testes cobrindo login/proteção de rota, fluxo de sucesso e
   os 4 tipos de `EventoErro` em cada cenário, regra de não-repetição, o fluxo completo de
   Avaliação Pós-Tarefa + Comparação Final + encerramento, e painel administrativo (incluindo as
   exclusões de sessão/usuário com confirmação) — todos passando contra o Postgres real. Ver

@@ -11,17 +11,26 @@ export interface HistoricoParticipacao {
   conjuntosTarefaConcluidos: string[];
 }
 
-export interface UsuarioComHistorico extends UsuarioPublico, HistoricoParticipacao {}
+// perfilUsuario é o perfil informado na sessão concluída mais recente (null se
+// ainda não concluiu nenhuma) — o perfil é da pessoa, não do cenário, então a
+// home o pré-seleciona e trava no segundo cenário, igual cenário/conjunto.
+export interface HistoricoComPerfil extends HistoricoParticipacao {
+  perfilUsuario: string | null;
+}
 
-export async function buscarHistoricoParticipacao(usuarioId: string): Promise<HistoricoParticipacao> {
+export interface UsuarioComHistorico extends UsuarioPublico, HistoricoComPerfil {}
+
+export async function buscarHistoricoParticipacao(usuarioId: string): Promise<HistoricoComPerfil> {
   const sessoes = await prisma.sessaoTeste.findMany({
     where: { usuarioId, timestampFim: { not: null } },
-    select: { cenario: true, conjuntoTarefa: true },
+    select: { cenario: true, conjuntoTarefa: true, perfilUsuario: true },
+    orderBy: { timestampInicio: "desc" },
   });
 
   return {
     cenariosConcluidos: [...new Set(sessoes.map((s) => s.cenario))],
     conjuntosTarefaConcluidos: [...new Set(sessoes.map((s) => s.conjuntoTarefa))],
+    perfilUsuario: sessoes[0]?.perfilUsuario ?? null,
   };
 }
 

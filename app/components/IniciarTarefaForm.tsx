@@ -26,7 +26,12 @@ export function IniciarTarefaForm({
   );
   const participacaoConcluida = cenariosDisponiveis.length === 0 || conjuntosDisponiveis.length === 0;
 
-  const [perfilUsuario, setPerfilUsuario] = useState<PerfilUsuario | "">("");
+  // Perfil é da pessoa, não do cenário: se já concluiu uma sessão, o mesmo
+  // perfil vem selecionado e travado no segundo cenário.
+  const perfilJaDefinido = usuario.perfilUsuario !== null;
+  const [perfilUsuario, setPerfilUsuario] = useState<PerfilUsuario | "">(
+    (usuario.perfilUsuario as PerfilUsuario | null) ?? "",
+  );
   const [cenario, setCenario] = useState(cenariosDisponiveis.length === 1 ? cenariosDisponiveis[0].value : "");
   const [conjuntoTarefa, setConjuntoTarefa] = useState(
     conjuntosDisponiveis.length === 1 ? conjuntosDisponiveis[0].value : "",
@@ -111,7 +116,8 @@ export function IniciarTarefaForm({
             <select
               value={perfilUsuario}
               onChange={(e) => setPerfilUsuario(e.target.value as PerfilUsuario)}
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none"
+              disabled={perfilJaDefinido}
+              className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none disabled:bg-zinc-100 disabled:text-zinc-500"
             >
               <option value="">Selecione...</option>
               {PERFIS_USUARIO.map((perfil) => (

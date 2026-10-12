@@ -1,16 +1,8 @@
 "use client";
 
-type Campo = "numero" | "fornecedor" | "dataEmissao" | "valorTotal";
+import { aplicarMascaraData, aplicarMascaraMoeda } from "@/lib/mascaras";
 
-// Só deixa dígito passar e insere os pontos sozinho (DD.MM.AAAA) — evita o
-// participante digitar separador errado, ano com 2 dígitos ou espaço sobrando,
-// que fazia a validação de data recusar valor que parecia certo.
-function aplicarMascaraData(valorDigitado: string): string {
-  const digitos = valorDigitado.replace(/\D/g, "").slice(0, 8);
-  if (digitos.length > 4) return `${digitos.slice(0, 2)}.${digitos.slice(2, 4)}.${digitos.slice(4)}`;
-  if (digitos.length > 2) return `${digitos.slice(0, 2)}.${digitos.slice(2)}`;
-  return digitos;
-}
+type Campo = "numero" | "fornecedor" | "dataEmissao" | "valorTotal";
 
 interface Props {
   numero: string;
@@ -58,16 +50,18 @@ export function FieldsetValidacao({
             onChange={(e) => onChange("dataEmissao", aplicarMascaraData(e.target.value))}
             placeholder="DD.MM.AAAA"
             maxLength={10}
-            className="w-20 border border-[#6b7280] bg-white px-3 py-2 text-base text-[#1b1c1c] focus:outline-none"
+            className="w-36 border border-[#6b7280] bg-white px-3 py-2 text-base text-[#1b1c1c] focus:outline-none"
           />
         </label>
         <label className="flex items-center gap-2 text-[11px] text-[#1b1c1c]">
           Valor Total:
           <input
             type="text"
+            inputMode="numeric"
             value={valorTotal}
-            onChange={(e) => onChange("valorTotal", e.target.value)}
-            className="w-24 border border-[#6b7280] bg-white px-3 py-2 text-right text-base text-[#1b1c1c] focus:outline-none"
+            onChange={(e) => onChange("valorTotal", aplicarMascaraMoeda(e.target.value))}
+            placeholder="0,00"
+            className="w-40 border border-[#6b7280] bg-white px-3 py-2 text-right text-base text-[#1b1c1c] focus:outline-none"
           />
         </label>
       </div>

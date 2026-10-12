@@ -1,6 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
+import { ARMAZENS_DISPONIVEIS } from "@/lib/task-config";
 
 interface Props {
   armazem: string;
@@ -27,12 +28,21 @@ export function FieldsetBaixa({
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-1 py-1">
         <label className="flex items-center gap-1 text-[11px] text-[#1b1c1c]">
           Dep. Destino:
-          <input
-            type="text"
+          {/* Select nativo: só aceita um depósito existente, e digitar com o
+              campo focado seleciona a opção correspondente (type-ahead). O
+              valor guardado continua sendo só o código (D01), igual ao modal. */}
+          <select
             value={armazem}
             onChange={(e) => onChangeArmazem(e.target.value)}
-            className="w-12 border border-[#6b7280] bg-white px-3 py-2 text-base text-[#1b1c1c] focus:outline-none"
-          />
+            className="w-64 border border-[#6b7280] bg-white px-2 py-2 text-base text-[#1b1c1c] focus:outline-none"
+          >
+            <option value="">Selecione...</option>
+            {ARMAZENS_DISPONIVEIS.map((deposito) => (
+              <option key={deposito.codigo} value={deposito.codigo}>
+                {deposito.codigo} - {deposito.nome}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={onAbrirModalDeposito}
@@ -48,7 +58,7 @@ export function FieldsetBaixa({
             type="text"
             value={lote}
             onChange={(e) => onChangeLote(e.target.value)}
-            className="w-24 border border-[#6b7280] bg-white px-3 py-2 text-base text-[#1b1c1c] focus:outline-none"
+            className="w-48 border border-[#6b7280] bg-white px-3 py-2 text-base text-[#1b1c1c] focus:outline-none"
           />
         </label>
         <label className="flex items-center gap-2 text-[11px] text-[#1b1c1c]">
