@@ -668,11 +668,12 @@ playwright.config.ts          configuração dos smoke tests E2E
   ajuda o usuário a perceber sozinho um erro que o sistema não pega).
 - **O aviso de reload usa o texto nativo do navegador**:, fora do controle da aplicação — não é
   possível estilizá-lo ou traduzir seu conteúdo por completo em todos os navegadores.
-- **O conteúdo real dos conjuntos de tarefa não fica no código**: `CONJUNTOS_TAREFA` em
-  `lib/task-config.ts` só define os rótulos (“Conjunto de Tarefas 1/2”); os dados de exemplo
-  de cada conjunto (duas notas fiscais fictícias, com itens e divergências propositais) foram
-  definidos pelo pesquisador e são entregues ao participante fora do sistema
-  (impresso ou verbalmente), por decisão de desenho do experimento.
+- **Os dados de cada conjunto de tarefa ficam em `DADOS_TAREFA` (`lib/task-config.ts`)** e
+  aparecem num painel colado na base da tela durante os dois cenários
+  (`app/components/PainelTarefa.tsx`) — uma nota fiscal fictícia por conjunto, com um item de
+  divergência proposital (não destacado para o participante). O painel pode ser minimizado, e
+  isso não conta como erro. Em telas baixas, o Cenário B precisa de rolagem para alcançar os
+  botões enquanto o painel está aberto.
 - **A desativação de um `Usuario` é definitiva até reativação manual**: acontece
   automaticamente ao final da Comparação Final (depois do segundo cenário) — dali em diante
   aquele código de acesso para de funcionar; só o painel admin pode reverter isso.

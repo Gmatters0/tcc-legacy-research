@@ -123,6 +123,25 @@ test.describe("Cenário A — campos de entrada", () => {
     await expect(validacao.nth(3)).toHaveValue("1.234.567,89");
   });
 
+  test("painel de dados da tarefa mostra a NF do conjunto e minimiza sem gerar erro", async ({ page }) => {
+    const usuario = await entrarNoCenarioA(page, "A-PAINEL");
+    const painel = page.getByRole("complementary", { name: "Dados da tarefa" });
+    await expect(painel).toContainText("4052");
+    await expect(painel).toContainText("Comercial Andrade Ltda");
+    await expect(painel).toContainText("CAB-2210");
+    await expect(painel).toContainText("D01 – Depósito Central");
+    await expect(painel).toContainText("Lote de Estoque A");
+
+    await painel.getByRole("button", { name: "Minimizar dados da tarefa" }).click();
+    await expect(painel).not.toContainText("4052");
+    await painel.getByRole("button", { name: "Expandir dados da tarefa" }).click();
+    await expect(painel).toContainText("4052");
+
+    // material de apoio, não parte do sistema avaliado: não conta como clique errado
+    const sessao = await buscarUltimaSessao(usuario.id);
+    expect(await buscarEventosErro(sessao.id)).toHaveLength(0);
+  });
+
   test("Dep. Destino só aceita depósitos existentes e não há botão Execute", async ({ page }) => {
     await entrarNoCenarioA(page, "A-DEPOSITO");
     const select = fieldset(page, "Baixa em Estoque").locator("select");

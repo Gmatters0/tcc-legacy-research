@@ -6,6 +6,7 @@ import { SessaoProvider, useSessao } from "@/lib/instrumentation/SessaoProvider"
 import { classificarTipoErroPorMensagem } from "@/lib/instrumentation/erros";
 import { TipoEventoErro } from "@/lib/instrumentation/types";
 import { pareceCampoTrocado } from "@/lib/instrumentation/heuristica";
+import { PainelTarefa } from "@/app/components/PainelTarefa";
 import { TopNavBar } from "./components/TopNavBar";
 import { FooterFKeys } from "./components/FooterFKeys";
 import { FieldsetValidacao } from "./components/FieldsetValidacao";
@@ -227,6 +228,7 @@ function CenarioAConteudo() {
           />
         </div>
       </main>
+      <PainelTarefa sessaoId={sessaoId} />
       <FooterFKeys onSalvar={handleSalvar} />
       {modalDepositoAberto && (
         <DepositoModal onSelecionar={handleSelecionarDeposito} onFechar={() => setModalDepositoAberto(false)} />

@@ -60,6 +60,11 @@ test.describe("Rotas de negócio exigem login (rede de segurança pós-hospedage
     expect(resposta.status()).toBe(401);
   });
 
+  test("GET /api/sessoes/[id] sem cookie de sessão retorna 401", async ({ request }) => {
+    const resposta = await request.get("/api/sessoes/inexistente");
+    expect(resposta.status()).toBe(401);
+  });
+
   test("POST /api/eventos-erro sem cookie de sessão retorna 401", async ({ request }) => {
     const resposta = await request.post("/api/eventos-erro", {
       data: { sessaoId: "inexistente", tipo: "CLIQUE_FORA_FLUXO" },

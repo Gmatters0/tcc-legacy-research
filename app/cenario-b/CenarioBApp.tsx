@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { SessaoProvider, useSessao } from "@/lib/instrumentation/SessaoProvider";
 import { TipoEventoErro } from "@/lib/instrumentation/types";
+import { PainelTarefa } from "@/app/components/PainelTarefa";
 import { TopAppBar } from "./components/TopAppBar";
 import { SideNavBar } from "./components/SideNavBar";
 import { Stepper } from "./components/Stepper";
@@ -101,6 +102,7 @@ function CenarioBConteudo() {
             />
           )}
         </main>
+        <PainelTarefa sessaoId={sessaoId} />
       </div>
     </div>
   );

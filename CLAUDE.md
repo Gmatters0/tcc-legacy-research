@@ -119,6 +119,8 @@ mudou:
                                        → "Iniciar Tarefa"). Participante não é mais texto livre,
                                        vem do usuário autenticado.
   /components
+    PainelTarefa.tsx                → faixa com os dados da NF da tarefa, usada nos dois cenários
+                                       (ver "Painel de Dados da Tarefa")
     LoginForm.tsx                   → formulário de código + senha, POST /api/auth/login
     IniciarTarefaForm.tsx           → formulário de setup pós-login + botão "sair"; pré-seleciona
                                        e trava cenário/conjunto já concluídos (ver "Regra de
@@ -169,7 +171,8 @@ mudou:
     /sessoes
       route.ts                      → POST cria SessaoTeste (exige login) + limpa sessões
                                        abandonadas
-      /[id]/route.ts                 → PATCH finaliza SessaoTeste (timestampFim)
+      /[id]/route.ts                 → GET dados mínimos da sessão (só o dono — usado pelo
+                                       PainelTarefa); PATCH finaliza SessaoTeste (timestampFim)
       /[id]/abandonar/route.ts       → POST remove SessaoTeste não finalizada (via beacon)
       /[id]/avaliacao/route.ts       → POST registra AvaliacaoPosTarefa (checa posse da sessão
                                        e que já foi finalizada)
@@ -187,8 +190,9 @@ mudou:
                                        PassoConferencia, PassoBaixa
 /lib
   prisma.ts                         → singleton do PrismaClient (com driver adapter)
-  task-config.ts                    → CENARIOS, CONJUNTOS_TAREFA, PERFIS_USUARIO,
-                                       ARMAZENS_DISPONIVEIS (compartilhado entre A e B)
+  task-config.ts                    → CENARIOS, CONJUNTOS_TAREFA, DADOS_TAREFA (NF de cada
+                                       conjunto), PERFIS_USUARIO, ARMAZENS_DISPONIVEIS
+                                       (compartilhado entre A e B)
   avaliacao-config.ts               → conteúdo da Avaliação Pós-Tarefa: SUS_ITENS,
                                        SUBJETIVO_ITENS, TLX_ITENS, calcularSusScore()
   mascaras.ts                       → aplicarMascaraMoeda()/aplicarMascaraData() — máscaras de
@@ -608,6 +612,28 @@ no resto de `business-logic`, não é uma regra exclusiva de auth):
   de agradecimento final planejada — essa é escopo das "Telas de encerramento" (ver "O que
   ainda falta implementar").
 
+## Painel de Dados da Tarefa
+
+Para o participante conseguir fazer a tarefa **sem o pesquisador por perto** (sessão remota,
+sem enviar o conjunto em papel/mensagem), os dois cenários exibem os dados da nota fiscal da
+tarefa — `app/components/PainelTarefa.tsx`, renderizado por `CenarioAApp` e `CenarioBApp`:
+
+- **Conteúdo** em `DADOS_TAREFA` (`lib/task-config.ts`, por `conjuntoTarefa`): instrução ao
+  participante, nº da NF, fornecedor, data de emissão, valor total, os 3 itens (código,
+  descrição, unidade, qtd. pedida/recebida), depósito de destino e lote. A divergência
+  proposital (qtd. recebida ≠ pedida) **não é destacada**.
+- **Qual conjunto mostrar**: o painel chama `GET /api/sessoes/[id]` (só o dono da sessão; devolve
+  `id`, `cenario`, `conjuntoTarefa`) — o `conjuntoTarefa` não vai na URL.
+- **Posicionamento**: faixa `sticky bottom-0` **no fluxo da página** (não sobreposta), idêntica
+  em A e B — empurra o conteúdo em vez de cobrir campos/botões. Uma versão flutuante no canto
+  foi descartada porque cobria Valor Total e "Próximo →" (B) e as colunas de quantidade (A). No
+  A fica entre a área principal e o rodapé de teclas de função. Em telas baixas o B precisa de
+  rolagem para alcançar os botões enquanto o painel está aberto; o participante pode minimizá-lo
+  para uma tira fina.
+- **Não é parte do sistema avaliado**: visual neutro (zinc), e minimizar/expandir **não gera
+  `EventoErro`**. Time-on-Task continua começando no clique em "Iniciar Tarefa" — como antes,
+  ler os dados faz parte do tempo.
+
 ## Telas de Encerramento
 
 Ao concluir a Baixa em Estoque com sucesso, os dois cenários navegam para a mesma tela
@@ -883,6 +909,9 @@ export de assets).
   o Stepper para voltar) e aviso nativo de reload em ambos os cenários — ver seção
   "Persistência de Navegação e Aviso de Reload".
 - Heurística `ERRO_LOGICO_CADASTRO` também no Cenário B (Fornecedor parecendo um Nº de NF).
+- Painel de dados da tarefa (NF, itens, depósito e lote do conjunto) fixo na base dos dois
+  cenários, para a pesquisa funcionar sem o pesquisador enviando o conjunto — ver seção
+  "Painel de Dados da Tarefa".
 - Cenário A completo: tela densa, TopNavBar, FooterFKeys (F2 funcional), 3 seções com
   inserção manual de itens, modal de seleção de depósito, fluxo de erro em 2 modais
   (confirmar → log completo).
@@ -896,7 +925,7 @@ export de assets).
   ambos os cenários após cada rodada de mudanças.
 - Testes automatizados unitários (Vitest, 80 testes) das camadas `business-logic`,
   `instrumentation` e `auth` — ver seção "Testes Automatizados".
-- Smoke tests E2E (Playwright): 36 testes cobrindo login/proteção de rota, fluxo de sucesso e
+- Smoke tests E2E (Playwright): 39 testes cobrindo login/proteção de rota, fluxo de sucesso e
   os 4 tipos de `EventoErro` em cada cenário, regra de não-repetição, o fluxo completo de
   Avaliação Pós-Tarefa + Comparação Final + encerramento, e painel administrativo (incluindo as
   exclusões de sessão/usuário com confirmação) — todos passando contra o Postgres real. Ver
@@ -906,8 +935,5 @@ export de assets).
 
 Itens explicitamente adiados desde o pedido original, ainda não implementados:
 
-- **Carregamento real dos conjuntos de tarefas de teste**: `CONJUNTOS_TAREFA` em
-  `lib/task-config.ts` é hoje só uma lista fixa de rótulos ("Conjunto de Tarefas 1/2"). O
-  conteúdo de cada conjunto (duas NFs de exemplo, com itens e divergências propositais) já foi
-  definido pelo pesquisador, mas por decisão dele é entregue ao participante fora do app
-  (impresso/verbal) — não precisa de UI própria, só documentação externa ao repositório.
+- Nada pendente no momento. (O conteúdo dos conjuntos de tarefa, antes entregue fora do app,
+  agora é exibido no painel — ver "Painel de Dados da Tarefa".)

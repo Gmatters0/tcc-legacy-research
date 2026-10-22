@@ -24,6 +24,26 @@ async function preencherPasso1(page: Page, opts: { numero: string; fornecedor: s
   await page.getByPlaceholder("Ex: 12.450,00").fill(opts.valorTotal);
 }
 
+test.describe("Cenário B — painel de dados da tarefa", () => {
+  test("mostra a NF do conjunto 2 e minimiza sem gerar erro", async ({ page }) => {
+    const usuario = await entrarNoCenarioB(page, "B-PAINEL", "conjunto-2");
+    const painel = page.getByRole("complementary", { name: "Dados da tarefa" });
+    await expect(painel).toContainText("7183");
+    await expect(painel).toContainText("Metalúrgica Vitória S.A.");
+    await expect(painel).toContainText("FIT-8820");
+    await expect(painel).toContainText("D02 – Depósito Filial Norte");
+    await expect(painel).toContainText("Lote de Estoque B");
+
+    await painel.getByRole("button", { name: "Minimizar dados da tarefa" }).click();
+    await expect(painel).not.toContainText("7183");
+    await painel.getByRole("button", { name: "Expandir dados da tarefa" }).click();
+    await expect(painel).toContainText("7183");
+
+    const sessao = await buscarUltimaSessao(usuario.id);
+    expect(await buscarEventosErro(sessao.id)).toHaveLength(0);
+  });
+});
+
 test.describe("Cenário B — fluxo de sucesso", () => {
   test("completa a tarefa sem divergência e chega em /sucesso", async ({ page }) => {
     const usuario = await entrarNoCenarioB(page, "B-SUCESSO");
